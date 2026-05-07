@@ -1,53 +1,37 @@
-# {{ NAME }}
+# Jwt
 
-{{ DESCRIPTION }}
+A PowerShell module for creating and managing JSON Web Tokens (JWT).
 
 ## Prerequisites
 
-This uses the following external resources:
+- [PowerShell 7+](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
 - The [PSModule framework](https://github.com/PSModule/Process-PSModule) for building, testing and publishing the module.
 
 ## Installation
 
-To install the module from the PowerShell Gallery, you can use the following command:
-
 ```powershell
-Install-PSResource -Name {{ NAME }}
-Import-Module -Name {{ NAME }}
+Install-PSResource -Name Jwt
+Import-Module -Name Jwt
 ```
 
 ## Usage
 
-Here is a list of example that are typical use cases for the module.
-
-### Example 1: Greet an entity
-
-Provide examples for typical commands that a user would like to do with the module.
+> [!NOTE]
+> This module is under active development. The placeholder function `New-Jwt` is available but not yet implemented.
 
 ```powershell
-Greet-Entity -Name 'World'
-Hello, World!
+New-Jwt
 ```
-
-### Example 2
-
-Provide examples for typical commands that a user would like to do with the module.
-
-```powershell
-Import-Module -Name PSModuleTemplate
-```
-
-### Find more examples
-
-To find more examples of how to use the module, please refer to the [examples](examples) folder.
-
-Alternatively, you can use the Get-Command -Module 'This module' to find more commands that are available in the module.
-To find examples of each of the commands you can use Get-Help -Examples 'CommandName'.
 
 ## Documentation
 
-Link to further documentation if available, or describe where in the repository users can find more detailed documentation about
-the module's functions and features.
+For more information about the module's functions and features, use:
+
+```powershell
+Get-Command -Module Jwt
+Get-Help New-Jwt
+```
+
 
 ## Contributing
 
