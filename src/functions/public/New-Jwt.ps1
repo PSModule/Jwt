@@ -16,7 +16,7 @@
         .NOTES
         This function is a placeholder and will be replaced with the actual implementation.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param()
 
     begin {}
