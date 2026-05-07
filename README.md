@@ -32,7 +32,6 @@ Get-Command -Module Jwt
 Get-Help New-Jwt
 ```
 
-
 ## Contributing
 
 Coder or not, you can contribute to the project! We welcome all contributions.

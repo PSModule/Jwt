@@ -22,7 +22,9 @@
     begin {}
 
     process {
-        Write-Warning 'New-Jwt is not yet implemented.'
+        if ($PSCmdlet.ShouldProcess('Creating a new JWT')) {
+            Write-Warning 'New-Jwt is not yet implemented.'
+        }
     }
 
     end {}
