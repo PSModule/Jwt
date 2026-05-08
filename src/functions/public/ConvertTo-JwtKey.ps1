@@ -4,9 +4,14 @@
         Convert a .NET key to a JWK ([JwtKey]).
 
         .DESCRIPTION
-        Converts an `RSA`, `ECDsa`, or `byte[]` (HMAC secret) instance into a `[JwtKey]`
-        representation per RFC 7517 / RFC 7518. Private fields are included only when the
-        source key contains private parameters.
+        Converts an `RSA`, `ECDsa`, or `byte[]` (HMAC secret) instance into a
+        `[JwtKey]` representation per RFC 7517 / RFC 7518.
+        Private fields are included only when `-IncludePrivate` is passed.
+
+        Supported key types and their JWK `kty`:
+          RSA                              → kty=RSA
+          ECDsa (P-256, P-384, P-521)      → kty=EC
+          byte[]                           → kty=oct
 
         .EXAMPLE
         $rsa = [System.Security.Cryptography.RSA]::Create(2048)
@@ -36,7 +41,7 @@
         [Parameter()]
         [string] $Kid,
 
-        # When converting an RSA or ECDsa key, include private parameters in the JWK.
+        # Include private key material in the JWK.
         [Parameter()]
         [switch] $IncludePrivate
     )
@@ -67,9 +72,9 @@
         $jwk.kty = 'EC'
         $curveName = $params.Curve.Oid.FriendlyName
         $jwk.crv = switch -Regex ($curveName) {
-            'nistP256|ECDSA_P256|secP256r1|prime256v1' { 'P-256' }
-            'nistP384|ECDSA_P384|secP384r1' { 'P-384' }
-            'nistP521|ECDSA_P521|secP521r1' { 'P-521' }
+            'nistP256|ECDSA_P256|secP256r1|prime256v1' { 'P-256'; break }
+            'nistP384|ECDSA_P384|secP384r1' { 'P-384'; break }
+            'nistP521|ECDSA_P521|secP521r1' { 'P-521'; break }
             default { $curveName }
         }
         $jwk.x = [JwtBase64Url]::Encode($params.Q.X)

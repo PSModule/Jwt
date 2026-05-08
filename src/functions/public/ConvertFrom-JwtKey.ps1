@@ -4,12 +4,13 @@
         Convert a JWK ([JwtKey]) into a .NET key.
 
         .DESCRIPTION
-        Materializes a `[JwtKey]` (RFC 7517) into a usable .NET cryptographic instance:
-        an `RSA` for `kty=RSA`, an `ECDsa` for `kty=EC`, or returns the raw secret bytes
-        for `kty=oct`.
+        Materializes a `[JwtKey]` (RFC 7517 / RFC 8037) into a usable .NET cryptographic
+        instance. Private parameters are imported when the JWK contains them.
 
-        For `kty=RSA`/`EC`, private parameters are imported when the JWK contains them
-        (e.g., `d`); otherwise a public-only key is returned.
+        Supported JWK `kty` values:
+          RSA  → [System.Security.Cryptography.RSA]
+          EC   → [System.Security.Cryptography.ECDsa] (P-256, P-384, P-521)
+          oct  → [byte[]]
 
         .EXAMPLE
         $rsa = ConvertFrom-JwtKey -JwtKey $jwk
@@ -17,7 +18,8 @@
         Returns an `RSA` instance suitable for verification.
 
         .OUTPUTS
-        System.Security.Cryptography.RSA, System.Security.Cryptography.ECDsa, or System.Byte[]
+        System.Security.Cryptography.RSA, System.Security.Cryptography.ECDsa,
+        System.Security.Cryptography.Ed25519, or System.Byte[]
     #>
     [OutputType([System.Security.Cryptography.RSA], [System.Security.Cryptography.ECDsa], [byte[]])]
     [CmdletBinding()]
