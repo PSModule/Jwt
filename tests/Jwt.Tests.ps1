@@ -6,17 +6,33 @@
 param()
 
 BeforeAll {
+    # RSA key — used for RS256/RS384/RS512/PS256/PS384/PS512
     $script:rsa = [System.Security.Cryptography.RSA]::Create(2048)
     $script:rsaPrivatePem = $script:rsa.ExportPkcs8PrivateKeyPem()
     $script:rsaPublicPem = $script:rsa.ExportSubjectPublicKeyInfoPem()
 
+    # EC P-256 — ES256
     $script:ecdsa = [System.Security.Cryptography.ECDsa]::Create(
-        [System.Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP256')
-    )
+        [System.Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP256'))
     $script:ecPrivatePem = $script:ecdsa.ExportPkcs8PrivateKeyPem()
     $script:ecPublicPem = $script:ecdsa.ExportSubjectPublicKeyInfoPem()
 
+    # EC P-384 — ES384
+    $script:ecdsa384 = [System.Security.Cryptography.ECDsa]::Create(
+        [System.Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP384'))
+    $script:ec384PrivatePem = $script:ecdsa384.ExportPkcs8PrivateKeyPem()
+    $script:ec384PublicPem = $script:ecdsa384.ExportSubjectPublicKeyInfoPem()
+
+    # EC P-521 — ES512
+    $script:ecdsa521 = [System.Security.Cryptography.ECDsa]::Create(
+        [System.Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP521'))
+    $script:ec521PrivatePem = $script:ecdsa521.ExportPkcs8PrivateKeyPem()
+    $script:ec521PublicPem = $script:ecdsa521.ExportSubjectPublicKeyInfoPem()
+
+    # Symmetric secrets — HS256/HS384/HS512
     $script:hmacSecret = [System.Text.Encoding]::UTF8.GetBytes('a-very-long-shared-secret-for-hmac-256-tests')
+    $script:hmacSecret384 = [System.Text.Encoding]::UTF8.GetBytes('a-very-long-shared-secret-for-hmac-384-tests-at-least-48-bytes')
+    $script:hmacSecret512 = [System.Text.Encoding]::UTF8.GetBytes('a-very-long-shared-secret-for-hmac-512-tests-that-is-at-least-64-bytes-long-enough')
 
     $script:basePayload = @{
         iss = 'https://issuer.example.com'
@@ -31,6 +47,8 @@ BeforeAll {
 AfterAll {
     if ($null -ne $script:rsa) { $script:rsa.Dispose() }
     if ($null -ne $script:ecdsa) { $script:ecdsa.Dispose() }
+    if ($null -ne $script:ecdsa384) { $script:ecdsa384.Dispose() }
+    if ($null -ne $script:ecdsa521) { $script:ecdsa521.Dispose() }
 }
 
 Describe 'New-Jwt' {
@@ -254,6 +272,82 @@ Describe 'Test-Jwt validation' {
     }
 }
 
+Describe 'All signing algorithms — sign and verify round-trip' {
+    It 'RS256 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem -Algorithm RS256
+        Test-Jwt -Token $jwt.ToString() -Key $script:rsaPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'RS384 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem -Algorithm RS384
+        Test-Jwt -Token $jwt.ToString() -Key $script:rsaPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'RS512 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem -Algorithm RS512
+        Test-Jwt -Token $jwt.ToString() -Key $script:rsaPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'PS256 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem -Algorithm PS256
+        Test-Jwt -Token $jwt.ToString() -Key $script:rsaPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'PS384 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem -Algorithm PS384
+        Test-Jwt -Token $jwt.ToString() -Key $script:rsaPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'PS512 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem -Algorithm PS512
+        Test-Jwt -Token $jwt.ToString() -Key $script:rsaPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'HS256 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:hmacSecret -Algorithm HS256
+        Test-Jwt -Token $jwt.ToString() -Key $script:hmacSecret -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'HS384 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:hmacSecret384 -Algorithm HS384
+        Test-Jwt -Token $jwt.ToString() -Key $script:hmacSecret384 -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'HS512 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:hmacSecret512 -Algorithm HS512
+        Test-Jwt -Token $jwt.ToString() -Key $script:hmacSecret512 -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'ES256 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:ecPrivatePem -Algorithm ES256
+        Test-Jwt -Token $jwt.ToString() -Key $script:ecPublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'ES384 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:ec384PrivatePem -Algorithm ES384
+        Test-Jwt -Token $jwt.ToString() -Key $script:ec384PublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'ES512 signs and verifies' {
+        $jwt = New-Jwt -Payload $script:basePayload -Key $script:ec521PrivatePem -Algorithm ES512
+        Test-Jwt -Token $jwt.ToString() -Key $script:ec521PublicPem -Audience 'api://test' | Should -BeTrue
+    }
+
+    It 'all algorithms produce the correct alg header value' {
+        $algs = @('RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'HS256', 'HS384', 'HS512', 'ES256', 'ES384', 'ES512')
+        $keys = @{
+            RS256 = $script:rsaPrivatePem; RS384 = $script:rsaPrivatePem; RS512 = $script:rsaPrivatePem
+            PS256 = $script:rsaPrivatePem; PS384 = $script:rsaPrivatePem; PS512 = $script:rsaPrivatePem
+            HS256 = $script:hmacSecret; HS384 = $script:hmacSecret384; HS512 = $script:hmacSecret512
+            ES256 = $script:ecPrivatePem; ES384 = $script:ec384PrivatePem; ES512 = $script:ec521PrivatePem
+        }
+        foreach ($alg in $algs) {
+            $jwt = New-Jwt -Payload $script:basePayload -Key $keys[$alg] -Algorithm $alg
+            $jwt.Header.alg | Should -Be $alg -Because "header alg should be $alg"
+        }
+    }
+}
+
 Describe 'JWK conversion' {
     It 'round-trips an RSA key' {
         $jwk = ConvertTo-JwtKey -Key $script:rsa -IncludePrivate -Use 'sig' -Alg 'RS256' -Kid 'k1'
@@ -263,8 +357,7 @@ Describe 'JWK conversion' {
         $jwk.d | Should -Not -BeNullOrEmpty
         $rsa2 = ConvertFrom-JwtKey -JwtKey $jwk
         try {
-            $payload = $script:basePayload
-            $jwt = New-Jwt -Payload $payload -Key $script:rsaPrivatePem
+            $jwt = New-Jwt -Payload $script:basePayload -Key $script:rsaPrivatePem
             Test-Jwt -Token $jwt.ToString() -Key $rsa2 -Audience 'api://test' | Should -BeTrue
         } finally { $rsa2.Dispose() }
     }
@@ -276,6 +369,28 @@ Describe 'JWK conversion' {
         $ec2 = ConvertFrom-JwtKey -JwtKey $jwk
         try {
             $jwt = New-Jwt -Payload $script:basePayload -Key $script:ecPrivatePem -Algorithm ES256
+            Test-Jwt -Token $jwt.ToString() -Key $ec2 -Audience 'api://test' | Should -BeTrue
+        } finally { $ec2.Dispose() }
+    }
+
+    It 'round-trips an EC P-384 key' {
+        $jwk = ConvertTo-JwtKey -Key $script:ecdsa384 -IncludePrivate
+        $jwk.kty | Should -Be 'EC'
+        $jwk.crv | Should -Be 'P-384'
+        $ec2 = ConvertFrom-JwtKey -JwtKey $jwk
+        try {
+            $jwt = New-Jwt -Payload $script:basePayload -Key $script:ec384PrivatePem -Algorithm ES384
+            Test-Jwt -Token $jwt.ToString() -Key $ec2 -Audience 'api://test' | Should -BeTrue
+        } finally { $ec2.Dispose() }
+    }
+
+    It 'round-trips an EC P-521 key' {
+        $jwk = ConvertTo-JwtKey -Key $script:ecdsa521 -IncludePrivate
+        $jwk.kty | Should -Be 'EC'
+        $jwk.crv | Should -Be 'P-521'
+        $ec2 = ConvertFrom-JwtKey -JwtKey $jwk
+        try {
+            $jwt = New-Jwt -Payload $script:basePayload -Key $script:ec521PrivatePem -Algorithm ES512
             Test-Jwt -Token $jwt.ToString() -Key $ec2 -Audience 'api://test' | Should -BeTrue
         } finally { $ec2.Dispose() }
     }
@@ -341,63 +456,58 @@ Describe 'Pipeline binding' {
     }
 }
 
-Describe 'Known external test vectors' {
+Describe 'Known external test vectors (jwt.io samples)' {
     BeforeAll {
-        # Sample tokens from jwt.io covering a supported (HS256) and two currently
-        # unsupported (HS384, ES512) algorithms. The HS384/ES512 vectors verify that
-        # parsing works for any well-formed token while Test-Jwt rejects the algorithm
-        # until the module adds it to the supported set.
-
         $script:vectorHs256 = @{
             Token  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30'
             Secret = 'a-string-secret-at-least-256-bits-long'
         }
-
-        $script:vectorHs384Token = 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.owv7q9nVbW5tqUezF_G2nHTra-ANW3HqW9epyVwh08Y-Z-FKsnG8eBIpC4GTfTVU'
-
+        $script:vectorHs384 = @{
+            Token  = 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.owv7q9nVbW5tqUezF_G2nHTra-ANW3HqW9epyVwh08Y-Z-FKsnG8eBIpC4GTfTVU'
+            Secret = 'a-valid-string-secret-that-is-at-least-384-bits-long'
+        }
         $script:vectorEs512Token = 'eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.AbVUinMiT3J_03je8WTOIl-VdggzvoFgnOsdouAs-DLOtQzau9valrq-S6pETyi9Q18HH-EuwX49Q7m3KC0GuNBJAc9Tksulgsdq8GqwIqZqDKmG7hNmDzaQG1Dpdezn2qzv-otf3ZZe-qNOXUMRImGekfQFIuH_MjD2e8RZyww6lbZk'
+        $script:vectorEs512PublicKey = @'
+-----BEGIN PUBLIC KEY-----
+MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBgc4HZz+/fBbC7lmEww0AO3NK9wVZ
+PDZ0VEnsaUFLEYpTzb90nITtJUcPUbvOsdZIZ1Q8fnbquAYgxXL5UgHMoywAib47
+6MkyyYgPk0BXZq3mq4zImTRNuaU9slj9TVJ3ScT3L1bXwVuPJDzpr5GOFpaj+WwM
+Al8G7CqwoJOsW7Kddns=
+-----END PUBLIC KEY-----
+'@
     }
 
-    It 'parses the HS256 vector with the documented payload' {
+    It 'parses and verifies the HS256 vector' {
         $parsed = $script:vectorHs256.Token | ConvertFrom-Jwt
         $parsed.Header.alg | Should -Be 'HS256'
-        $parsed.Header.typ | Should -Be 'JWT'
         $parsed.Payload.sub | Should -Be '1234567890'
         $parsed.Payload.iat | Should -Be 1516239022
         $parsed.Payload.AdditionalFields['name'] | Should -Be 'John Doe'
         $parsed.Payload.AdditionalFields['admin'] | Should -BeTrue
+        Test-Jwt -Token $script:vectorHs256.Token -Key $script:vectorHs256.Secret -RequireExpiration $false | Should -BeTrue
     }
 
-    It 'verifies the HS256 vector against its documented secret' {
-        $secret = $script:vectorHs256.Secret
-        Test-Jwt -Token $script:vectorHs256.Token -Key $secret -RequireExpiration $false | Should -BeTrue
+    It 'rejects the HS256 vector with the wrong secret' {
+        Test-Jwt -Token $script:vectorHs256.Token -Key 'wrong-secret' -RequireExpiration $false | Should -BeFalse
     }
 
-    It 'rejects the HS256 vector when verified with the wrong secret' {
-        Test-Jwt -Token $script:vectorHs256.Token -Key 'wrong-secret-value' -RequireExpiration $false | Should -BeFalse
-    }
-
-    It 'parses the HS384 vector even though HS384 is not in the supported algorithm set' {
-        $parsed = $script:vectorHs384Token | ConvertFrom-Jwt
+    It 'parses and verifies the HS384 vector' {
+        $parsed = $script:vectorHs384.Token | ConvertFrom-Jwt
         $parsed.Header.alg | Should -Be 'HS384'
         $parsed.Payload.sub | Should -Be '1234567890'
         $parsed.Payload.AdditionalFields['name'] | Should -Be 'John Doe'
+        Test-Jwt -Token $script:vectorHs384.Token -Key $script:vectorHs384.Secret -RequireExpiration $false | Should -BeTrue
     }
 
-    It 'rejects the HS384 vector at validation because HS384 is not yet supported' {
-        { Test-Jwt -Token $script:vectorHs384Token -Key 'a-valid-string-secret-that-is-at-least-384-bits-long' -RequireExpiration $false } |
-            Should -Throw '*HS384*'
+    It 'rejects the HS384 vector with the wrong secret' {
+        Test-Jwt -Token $script:vectorHs384.Token -Key 'wrong-secret' -RequireExpiration $false | Should -BeFalse
     }
 
-    It 'parses the ES512 vector even though ES512 is not in the supported algorithm set' {
+    It 'parses and verifies the ES512 vector against the documented public key' {
         $parsed = $script:vectorEs512Token | ConvertFrom-Jwt
         $parsed.Header.alg | Should -Be 'ES512'
         $parsed.Payload.sub | Should -Be '1234567890'
         $parsed.Payload.AdditionalFields['admin'] | Should -BeTrue
-    }
-
-    It 'rejects the ES512 vector at validation because ES512 is not yet supported' {
-        { Test-Jwt -Token $script:vectorEs512Token -Key 'unused' -RequireExpiration $false } |
-            Should -Throw '*ES512*'
+        Test-Jwt -Token $script:vectorEs512Token -Key $script:vectorEs512PublicKey -RequireExpiration $false | Should -BeTrue
     }
 }
