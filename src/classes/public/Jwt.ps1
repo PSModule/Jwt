@@ -43,7 +43,7 @@
     static hidden [string] EncodeSegment([object] $value) {
         if ($null -eq $value) { return '' }
         $dict = $null
-        if ($value -is [JwtHeader] -or $value -is [JwtPayload]) {
+        if ($null -ne $value.PSObject.Methods['ToOrderedDictionary']) {
             $dict = $value.ToOrderedDictionary()
         } else {
             $dict = $value
