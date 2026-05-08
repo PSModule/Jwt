@@ -340,3 +340,64 @@ Describe 'Pipeline binding' {
         $jwt.ToString() | Test-Jwt -Key $script:hmacSecret -Audience 'api://test' | Should -BeTrue
     }
 }
+
+Describe 'Known external test vectors' {
+    BeforeAll {
+        # Sample tokens from jwt.io covering a supported (HS256) and two currently
+        # unsupported (HS384, ES512) algorithms. The HS384/ES512 vectors verify that
+        # parsing works for any well-formed token while Test-Jwt rejects the algorithm
+        # until the module adds it to the supported set.
+
+        $script:vectorHs256 = @{
+            Token  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30'
+            Secret = 'a-string-secret-at-least-256-bits-long'
+        }
+
+        $script:vectorHs384Token = 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.owv7q9nVbW5tqUezF_G2nHTra-ANW3HqW9epyVwh08Y-Z-FKsnG8eBIpC4GTfTVU'
+
+        $script:vectorEs512Token = 'eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.AbVUinMiT3J_03je8WTOIl-VdggzvoFgnOsdouAs-DLOtQzau9valrq-S6pETyi9Q18HH-EuwX49Q7m3KC0GuNBJAc9Tksulgsdq8GqwIqZqDKmG7hNmDzaQG1Dpdezn2qzv-otf3ZZe-qNOXUMRImGekfQFIuH_MjD2e8RZyww6lbZk'
+    }
+
+    It 'parses the HS256 vector with the documented payload' {
+        $parsed = $script:vectorHs256.Token | ConvertFrom-Jwt
+        $parsed.Header.alg | Should -Be 'HS256'
+        $parsed.Header.typ | Should -Be 'JWT'
+        $parsed.Payload.sub | Should -Be '1234567890'
+        $parsed.Payload.iat | Should -Be 1516239022
+        $parsed.Payload.AdditionalFields['name'] | Should -Be 'John Doe'
+        $parsed.Payload.AdditionalFields['admin'] | Should -BeTrue
+    }
+
+    It 'verifies the HS256 vector against its documented secret' {
+        $secret = $script:vectorHs256.Secret
+        Test-Jwt -Token $script:vectorHs256.Token -Key $secret -RequireExpiration $false | Should -BeTrue
+    }
+
+    It 'rejects the HS256 vector when verified with the wrong secret' {
+        Test-Jwt -Token $script:vectorHs256.Token -Key 'wrong-secret-value' -RequireExpiration $false | Should -BeFalse
+    }
+
+    It 'parses the HS384 vector even though HS384 is not in the supported algorithm set' {
+        $parsed = $script:vectorHs384Token | ConvertFrom-Jwt
+        $parsed.Header.alg | Should -Be 'HS384'
+        $parsed.Payload.sub | Should -Be '1234567890'
+        $parsed.Payload.AdditionalFields['name'] | Should -Be 'John Doe'
+    }
+
+    It 'rejects the HS384 vector at validation because HS384 is not yet supported' {
+        { Test-Jwt -Token $script:vectorHs384Token -Key 'a-valid-string-secret-that-is-at-least-384-bits-long' -RequireExpiration $false } |
+            Should -Throw '*HS384*'
+    }
+
+    It 'parses the ES512 vector even though ES512 is not in the supported algorithm set' {
+        $parsed = $script:vectorEs512Token | ConvertFrom-Jwt
+        $parsed.Header.alg | Should -Be 'ES512'
+        $parsed.Payload.sub | Should -Be '1234567890'
+        $parsed.Payload.AdditionalFields['admin'] | Should -BeTrue
+    }
+
+    It 'rejects the ES512 vector at validation because ES512 is not yet supported' {
+        { Test-Jwt -Token $script:vectorEs512Token -Key 'unused' -RequireExpiration $false } |
+            Should -Throw '*ES512*'
+    }
+}
