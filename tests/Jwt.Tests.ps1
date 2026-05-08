@@ -31,8 +31,12 @@ BeforeAll {
 
     # Symmetric secrets — HS256/HS384/HS512
     $script:hmacSecret = [System.Text.Encoding]::UTF8.GetBytes('a-very-long-shared-secret-for-hmac-256-tests')
-    $script:hmacSecret384 = [System.Text.Encoding]::UTF8.GetBytes('a-very-long-shared-secret-for-hmac-384-tests-at-least-48-bytes')
-    $script:hmacSecret512 = [System.Text.Encoding]::UTF8.GetBytes('a-very-long-shared-secret-for-hmac-512-tests-that-is-at-least-64-bytes-long-enough')
+    $script:hmacSecret384 = [System.Text.Encoding]::UTF8.GetBytes(
+        'a-very-long-shared-secret-for-hmac-384-tests-at-least-48-bytes'
+    )
+    $script:hmacSecret512 = [System.Text.Encoding]::UTF8.GetBytes(
+        'a-very-long-shared-secret-for-hmac-512-tests-that-is-at-least-64-bytes-long-enough'
+    )
 
     $script:basePayload = @{
         iss = 'https://issuer.example.com'
@@ -266,8 +270,10 @@ Describe 'Test-Jwt validation' {
     }
 
     It 'rejects alg=none without -AllowUnsigned' {
-        $h = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes('{"alg":"none","typ":"JWT"}')).TrimEnd('=').Replace('+', '-').Replace('/', '_')
-        $p = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes('{"a":1}')).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+        $headerBytes = [System.Text.Encoding]::UTF8.GetBytes('{"alg":"none","typ":"JWT"}')
+        $h = [Convert]::ToBase64String($headerBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+        $payloadBytes = [System.Text.Encoding]::UTF8.GetBytes('{"a":1}')
+        $p = [Convert]::ToBase64String($payloadBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
         { Test-Jwt -Token "$h.$p." -Key $script:hmacSecret } | Should -Throw
     }
 }
@@ -458,15 +464,33 @@ Describe 'Pipeline binding' {
 
 Describe 'Known external test vectors (jwt.io samples)' {
     BeforeAll {
+        $hs256Token = @(
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
+            'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0'
+            'KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30'
+        ) -join '.'
         $script:vectorHs256 = @{
-            Token  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30'
+            Token  = $hs256Token
             Secret = 'a-string-secret-at-least-256-bits-long'
         }
+        $hs384Token = @(
+            'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9'
+            'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0'
+            'owv7q9nVbW5tqUezF_G2nHTra-ANW3HqW9epyVwh08Y-Z-FKsnG8eBIpC4GTfTVU'
+        ) -join '.'
         $script:vectorHs384 = @{
-            Token  = 'eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.owv7q9nVbW5tqUezF_G2nHTra-ANW3HqW9epyVwh08Y-Z-FKsnG8eBIpC4GTfTVU'
+            Token  = $hs384Token
             Secret = 'a-valid-string-secret-that-is-at-least-384-bits-long'
         }
-        $script:vectorEs512Token = 'eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.AbVUinMiT3J_03je8WTOIl-VdggzvoFgnOsdouAs-DLOtQzau9valrq-S6pETyi9Q18HH-EuwX49Q7m3KC0GuNBJAc9Tksulgsdq8GqwIqZqDKmG7hNmDzaQG1Dpdezn2qzv-otf3ZZe-qNOXUMRImGekfQFIuH_MjD2e8RZyww6lbZk'
+        $es512Sig = -join @(
+            'AbVUinMiT3J_03je8WTOIl-VdggzvoFgnOsdouAs-DLOtQzau9valrq-S6pETyi9Q18HH-EuwX49Q7m3KC0GuNBJAc9T'
+            'ksulgsdq8GqwIqZqDKmG7hNmDzaQG1Dpdezn2qzv-otf3ZZe-qNOXUMRImGekfQFIuH_MjD2e8RZyww6lbZk'
+        )
+        $script:vectorEs512Token = @(
+            'eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9'
+            'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0'
+            $es512Sig
+        ) -join '.'
         $script:vectorEs512PublicKey = @'
 -----BEGIN PUBLIC KEY-----
 MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBgc4HZz+/fBbC7lmEww0AO3NK9wVZ

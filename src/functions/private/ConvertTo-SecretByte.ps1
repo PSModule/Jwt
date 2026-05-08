@@ -1,4 +1,4 @@
-﻿function ConvertTo-SecretBytes {
+﻿function ConvertTo-SecretByte {
     <#
         .SYNOPSIS
         Convert an HMAC secret parameter into a byte array.
@@ -9,7 +9,7 @@
         Internal helper used by HS256 signing and verification.
 
         .EXAMPLE
-        ConvertTo-SecretBytes -Key 'topsecret'
+        ConvertTo-SecretByte -Key 'topsecret'
 
         Returns the UTF-8 byte representation of the string.
 

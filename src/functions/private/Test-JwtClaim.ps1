@@ -98,7 +98,10 @@
         if ($matched) {
             $checks.Add(@{ Name = 'Audience'; Passed = $true; Reason = $null })
         } else {
-            $checks.Add(@{ Name = 'Audience'; Passed = $false; Reason = "Audience mismatch: expected one of [$($Audience -join ', ')], got [$($tokenAud -join ', ')]." })
+            $expected = $Audience -join ', '
+            $actual = $tokenAud -join ', '
+            $reason = "Audience mismatch: expected one of [$expected], got [$actual]."
+            $checks.Add(@{ Name = 'Audience'; Passed = $false; Reason = $reason })
         }
     } else {
         $checks.Add(@{ Name = 'Audience'; Passed = $true; Reason = $null })

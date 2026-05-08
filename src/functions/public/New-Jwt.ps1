@@ -109,7 +109,7 @@
                 break
             }
             '^HS' {
-                $secret = ConvertTo-SecretBytes -Key $Key
+                $secret = ConvertTo-SecretByte -Key $Key
                 $hmac = switch ($Algorithm) {
                     'HS256' { [System.Security.Cryptography.HMACSHA256]::new($secret) }
                     'HS384' { [System.Security.Cryptography.HMACSHA384]::new($secret) }

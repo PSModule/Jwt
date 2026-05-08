@@ -25,6 +25,10 @@
         .OUTPUTS
         System.Object or System.Collections.Specialized.OrderedDictionary
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSReviewUnusedParameter', 'ErrorIfMissing',
+        Justification = 'Used inside scriptblock $getOne'
+    )]
     [OutputType([object])]
     [CmdletBinding()]
     param(

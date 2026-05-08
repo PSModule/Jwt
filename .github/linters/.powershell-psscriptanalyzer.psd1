@@ -51,6 +51,8 @@
     }
     ExcludeRules = @(
         'PSMissingModuleManifestField', # This rule is not applicable until the module is built.
-        'PSUseToExportFieldsInManifest'
+        'PSUseOutputTypeCorrectly',     # False positives with class-based return types and array unrolling.
+        'PSUseToExportFieldsInManifest',
+        'TypeNotFound'                  # Expected when class files are dot-sourced separately.
     )
 }

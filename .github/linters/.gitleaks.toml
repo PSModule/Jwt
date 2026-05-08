@@ -1,0 +1,9 @@
+# Gitleaks configuration for the Jwt module.
+# The test file contains well-known public JWT test vectors from jwt.io
+# that are not real secrets. Allow the 'jwt' rule in test files.
+
+[allowlist]
+  description = "Allow well-known JWT test vectors in test files"
+  paths = [
+    '''tests/Jwt\.Tests\.ps1'''
+  ]

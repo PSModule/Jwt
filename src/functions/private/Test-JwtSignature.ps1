@@ -86,7 +86,7 @@
             } elseif ($Key -is [string] -and $Key -match '-----BEGIN') {
                 throw "Algorithm $alg requires a symmetric secret, not a PEM-encoded key (algorithm-confusion attack guard)."
             } else {
-                $secret = ConvertTo-SecretBytes -Key $Key
+                $secret = ConvertTo-SecretByte -Key $Key
             }
             $hmac = switch ($alg) {
                 'HS256' { [System.Security.Cryptography.HMACSHA256]::new($secret) }
