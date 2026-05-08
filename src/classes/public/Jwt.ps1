@@ -1,6 +1,9 @@
 ﻿class Jwt {
-    [JwtHeader] $Header
-    [JwtPayload] $Payload
+    # Property types are intentionally [object] so this class file can be parsed before its
+    # sibling class files (JwtHeader, JwtPayload) are loaded. Constructor parameters still
+    # enforce the concrete types.
+    [object] $Header
+    [object] $Payload
     [string] $Signature
     [string] $EncodedHeader
     [string] $EncodedPayload
