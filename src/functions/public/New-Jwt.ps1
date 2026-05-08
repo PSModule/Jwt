@@ -7,13 +7,16 @@
         Builds a JWT from header overrides and a claims hashtable. By default the token is
         signed with the supplied `-Key` using the requested `-Algorithm`. With `-Unsigned`,
         the token is returned with an empty signature so the signing step can be performed
-        externally (for example via Azure Key Vault, an HSM, or another remote signer); the
-        consumer assigns `$jwt.Signature` after computing the signature against
-        `$jwt.SigningInput()`.
+        externally (Azure Key Vault, an HSM, a remote signing service, etc.).
 
-        Supported algorithms: RS256 (RSA + SHA-256, PKCS#1 v1.5), HS256 (HMAC + SHA-256),
-        ES256 (ECDSA P-256 + SHA-256). All `ConvertTo-Json` calls use `-Depth 100 -Compress`
-        and emit from `[ordered]` dictionaries so signatures verify deterministically.
+        Supported algorithms:
+          HMAC     — HS256, HS384, HS512
+          RSA      — RS256, RS384, RS512 (PKCS#1 v1.5)
+          RSA-PSS  — PS256, PS384, PS512
+          ECDSA    — ES256 (P-256), ES384 (P-384), ES512 (P-521)
+
+        All `ConvertTo-Json` calls use `-Depth 100 -Compress` and emit from `[ordered]`
+        dictionaries so signatures verify deterministically.
 
         .EXAMPLE
         $pem = Get-Content ./private.pem -Raw
@@ -23,7 +26,7 @@
         Creates a signed RS256 JWT.
 
         .EXAMPLE
-        $jwt = New-Jwt -Payload @{ iss = 'app' } -Unsigned
+        $jwt = New-Jwt -Payload @{ iss = 'app' } -Unsigned -Algorithm RS256
         $jwt.SigningInput()  # send to external signer
         $jwt.Signature = $externalBase64UrlSignature
         $jwt.ToString()
@@ -46,8 +49,10 @@
         [Parameter(Mandatory)]
         [hashtable] $Payload,
 
-        # Signing key. RSA PEM string (or [securestring] wrapping a PEM) for RS256;
-        # EC PEM string for ES256; [byte[]], raw secret [string], or [securestring] for HS256.
+        # Signing key. Type must match the algorithm:
+        #   HS256/HS384/HS512 — [byte[]], [string], or [securestring] (UTF-8 secret)
+        #   RS256/RS384/RS512/PS256/PS384/PS512 — RSA PEM [string] or [securestring]
+        #   ES256/ES384/ES512 — EC PEM [string] or [securestring]
         [Parameter(Mandatory, ParameterSetName = 'Signed')]
         [object] $Key,
 
@@ -57,7 +62,7 @@
 
         # Signing algorithm. Stored in the header regardless of whether the token is signed.
         [Parameter()]
-        [ValidateSet('RS256', 'HS256', 'ES256')]
+        [ValidateSet('HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512')]
         [string] $Algorithm = 'RS256'
     )
 
@@ -75,40 +80,54 @@
 
         if ($Unsigned) { return $jwt }
 
-        $signingInput = $jwt.SigningInput()
-        $inputBytes = [System.Text.Encoding]::UTF8.GetBytes($signingInput)
+        $inputBytes = [System.Text.Encoding]::UTF8.GetBytes($jwt.SigningInput())
+
+        $hashAlg = switch -Wildcard ($Algorithm) {
+            '*256' { [System.Security.Cryptography.HashAlgorithmName]::SHA256 }
+            '*384' { [System.Security.Cryptography.HashAlgorithmName]::SHA384 }
+            '*512' { [System.Security.Cryptography.HashAlgorithmName]::SHA512 }
+            default { [System.Security.Cryptography.HashAlgorithmName]::new() }
+        }
+
         $sigBytes = $null
 
-        switch ($Algorithm) {
-            'RS256' {
+        switch -Regex ($Algorithm) {
+            '^RS' {
                 $rsa = [System.Security.Cryptography.RSA]::Create()
                 try {
-                    $pem = ConvertTo-PlainKey -Key $Key
-                    $rsa.ImportFromPem($pem.ToCharArray())
-                    $sigBytes = $rsa.SignData(
-                        $inputBytes,
-                        [System.Security.Cryptography.HashAlgorithmName]::SHA256,
-                        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
-                    )
+                    $rsa.ImportFromPem((ConvertTo-PlainKey -Key $Key).ToCharArray())
+                    $sigBytes = $rsa.SignData($inputBytes, $hashAlg, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
                 } finally { $rsa.Dispose() }
+                break
             }
-            'HS256' {
+            '^PS' {
+                $rsa = [System.Security.Cryptography.RSA]::Create()
+                try {
+                    $rsa.ImportFromPem((ConvertTo-PlainKey -Key $Key).ToCharArray())
+                    $sigBytes = $rsa.SignData($inputBytes, $hashAlg, [System.Security.Cryptography.RSASignaturePadding]::Pss)
+                } finally { $rsa.Dispose() }
+                break
+            }
+            '^HS' {
                 $secret = ConvertTo-SecretBytes -Key $Key
-                $hmac = [System.Security.Cryptography.HMACSHA256]::new($secret)
+                $hmac = switch ($Algorithm) {
+                    'HS256' { [System.Security.Cryptography.HMACSHA256]::new($secret) }
+                    'HS384' { [System.Security.Cryptography.HMACSHA384]::new($secret) }
+                    'HS512' { [System.Security.Cryptography.HMACSHA512]::new($secret) }
+                }
                 try { $sigBytes = $hmac.ComputeHash($inputBytes) } finally { $hmac.Dispose() }
+                break
             }
-            'ES256' {
+            '^ES' {
                 $ecdsa = [System.Security.Cryptography.ECDsa]::Create()
                 try {
-                    $pem = ConvertTo-PlainKey -Key $Key
-                    $ecdsa.ImportFromPem($pem.ToCharArray())
-                    $sigBytes = $ecdsa.SignData(
-                        $inputBytes,
-                        [System.Security.Cryptography.HashAlgorithmName]::SHA256
-                    )
+                    $ecdsa.ImportFromPem((ConvertTo-PlainKey -Key $Key).ToCharArray())
+                    $sigBytes = $ecdsa.SignData($inputBytes, $hashAlg)
                 } finally { $ecdsa.Dispose() }
+                break
             }
         }
+
 
         $jwt.Signature = [JwtBase64Url]::Encode($sigBytes)
         return $jwt
