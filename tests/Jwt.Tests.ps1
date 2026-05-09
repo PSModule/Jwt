@@ -6,7 +6,46 @@
 param()
 
 Describe 'Data-driven tests' {
+    BeforeAll {
+        $script:ModuleManifest = Join-Path $PSScriptRoot '../src/JWT.psd1'
+        Import-Module -Name $script:ModuleManifest -Force
+    }
+
+    AfterAll {
+        Remove-Module -Name JWT -Force -ErrorAction SilentlyContinue
+    }
+
     $testCases = . "$PSScriptRoot/Data/TestCases.ps1"
+
+    Context 'Module metadata' {
+        It 'publishes the maintained Jwt continuation metadata' {
+            $manifest = Import-PowerShellDataFile -Path $script:ModuleManifest
+
+            $manifest.ModuleVersion.ToString() | Should -Be '1.9.2'
+            $manifest.RootModule | Should -Be 'JWT.psm1'
+            $manifest.GUID | Should -Be 'd4592298-b1a3-4a7d-b6fc-2ac16cc0e722'
+            $manifest.PrivateData.PSData.ProjectUri | Should -Be 'https://github.com/PSModule/Jwt'
+            $manifest.PrivateData.PSData.LicenseUri | Should -Be 'https://github.com/PSModule/Jwt/blob/main/LICENSE'
+        }
+
+        It 'exports the current Jwt command surface' {
+            $expectedFunctions = @(
+                'ConvertFrom-Base64UrlString'
+                'ConvertTo-Base64UrlString'
+                'Get-JwtHeader'
+                'Get-JwtPayload'
+                'New-Jwt'
+                'Test-Jwt'
+            )
+            $commands = Get-Command -Module JWT | Select-Object -ExpandProperty Name
+
+            foreach ($function in $expectedFunctions) {
+                $commands | Should -Contain $function
+            }
+
+            Get-Alias -Name 'Verify-JwtSignature' | Select-Object -ExpandProperty ReferencedCommand | Should -Be 'Test-Jwt'
+        }
+    }
 
     Context '<Name>' -ForEach $testCases {
         It 'ConvertTo-Base64UrlString - encodes the header as base64url' {

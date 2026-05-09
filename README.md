@@ -1,11 +1,6 @@
 # Jwt
 
-A PowerShell module for creating and managing JSON Web Tokens (JWT).
-
-## Prerequisites
-
-- [PowerShell 7+](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell)
-- The [PSModule framework](https://github.com/PSModule/Process-PSModule) for building, testing and publishing the module.
+`Jwt` is a PowerShell module for creating and verifying JSON Web Tokens. This repository maintains the current `Jwt` module command surface under PSModule maintenance so existing users can continue to install and use the package from PowerShell Gallery.
 
 ## Installation
 
@@ -14,22 +9,45 @@ Install-PSResource -Name Jwt
 Import-Module -Name Jwt
 ```
 
-## Usage
+## Commands
 
-> [!NOTE]
-> This module is under active development. The placeholder function `New-Jwt` is available but not yet implemented.
+The maintained module exports the same JWT commands and alias used by the current package:
 
 ```powershell
+ConvertFrom-Base64UrlString
+ConvertTo-Base64UrlString
+Get-JwtHeader
+Get-JwtPayload
 New-Jwt
+Test-Jwt
+Verify-JwtSignature
 ```
 
-## Documentation
+## Usage
 
-For more information about the module's functions and features, use:
+Create and validate an HMAC-signed JWT:
+
+```powershell
+$header = '{"alg":"HS256","typ":"JWT"}'
+$payload = '{"sub":"1234567890","name":"John Doe","admin":true,"iat":1516239022}'
+$secret = 'a-string-secret-at-least-256-bits-long'
+
+$jwt = New-Jwt -Header $header -PayloadJson $payload -Secret $secret
+Test-Jwt -jwt $jwt -Secret $secret
+```
+
+Read the header and payload from an existing token:
+
+```powershell
+Get-JwtHeader -jwt $jwt
+Get-JwtPayload -jwt $jwt
+```
+
+For more information about each command, use PowerShell help:
 
 ```powershell
 Get-Command -Module Jwt
-Get-Help New-Jwt
+Get-Help New-Jwt -Full
 ```
 
 ## Contributing
