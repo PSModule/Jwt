@@ -201,9 +201,16 @@ Describe 'Test-Jwt validation' {
     It 'returns $false for a tampered signature' {
         $jwt = New-Jwt -Payload $script:basePayload -Key $script:hmacSecret -Algorithm HS256
         $compact = $jwt.ToString()
-        $lastChar = $compact[$compact.Length - 1]
-        $replacement = if ($lastChar -eq 'A') { 'B' } else { 'A' }
-        $tampered = $compact.Substring(0, $compact.Length - 1) + $replacement
+        # Tamper with the first character of the signature segment.
+        # Changing the last character can fall on Base64URL padding bits
+        # (e.g., for 32-byte HMAC-SHA256 the last char carries only 4 data
+        # bits), producing identical decoded bytes and a false pass.
+        $parts = $compact.Split('.')
+        $sig = $parts[2]
+        $firstChar = $sig[0]
+        $replacement = if ($firstChar -eq 'A') { 'B' } else { 'A' }
+        $parts[2] = $replacement + $sig.Substring(1)
+        $tampered = $parts -join '.'
         Test-Jwt -Token $tampered -Key $script:hmacSecret -Audience 'api://test' | Should -BeFalse
     }
 
