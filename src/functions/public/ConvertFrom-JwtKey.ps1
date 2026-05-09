@@ -13,7 +13,9 @@
           oct  → [byte[]]
 
         .EXAMPLE
+        ```powershell
         $rsa = ConvertFrom-JwtKey -JwtKey $jwk
+        ```
 
         Returns an `RSA` instance suitable for verification.
 

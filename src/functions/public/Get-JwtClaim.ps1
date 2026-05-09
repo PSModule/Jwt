@@ -13,12 +13,16 @@
         non-terminating error per missing name.
 
         .EXAMPLE
+        ```powershell
         $tokenString | Get-JwtClaim -Name iss
+        ```
 
         Returns the issuer claim.
 
         .EXAMPLE
+        ```powershell
         $tokenString | Get-JwtClaim -Name iss, sub, scope
+        ```
 
         Returns an ordered hashtable with the three claim values.
 

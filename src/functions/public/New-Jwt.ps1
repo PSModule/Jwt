@@ -19,17 +19,21 @@
         dictionaries so signatures verify deterministically.
 
         .EXAMPLE
+        ```powershell
         $pem = Get-Content ./private.pem -Raw
         $jwt = New-Jwt -Payload @{ iss = 'app'; sub = 'svc'; exp = 1800000000 } -Key $pem -Algorithm RS256
         $jwt.ToString()
+        ```
 
         Creates a signed RS256 JWT.
 
         .EXAMPLE
+        ```powershell
         $jwt = New-Jwt -Payload @{ iss = 'app' } -Unsigned -Algorithm RS256
         $jwt.SigningInput()  # send to external signer
         $jwt.Signature = $externalBase64UrlSignature
         $jwt.ToString()
+        ```
 
         Builds an unsigned token, then attaches an externally computed signature.
 

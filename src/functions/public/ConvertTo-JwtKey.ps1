@@ -14,8 +14,10 @@
           byte[]                           → kty=oct
 
         .EXAMPLE
+        ```powershell
         $rsa = [System.Security.Cryptography.RSA]::Create(2048)
         $jwk = ConvertTo-JwtKey -Key $rsa -Use 'sig' -Alg 'RS256' -Kid 'key-1'
+        ```
 
         Returns a `[JwtKey]` with `kty='RSA'`.
 

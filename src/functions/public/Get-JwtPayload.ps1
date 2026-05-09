@@ -8,7 +8,9 @@
         a `[securestring]`, or an existing `[Jwt]`. The signature is not verified.
 
         .EXAMPLE
+        ```powershell
         $tokenString | Get-JwtPayload
+        ```
 
         Returns the parsed payload.
 

@@ -11,9 +11,11 @@
         Pipeline-friendly: `Get-Content token.txt | ConvertFrom-Jwt`.
 
         .EXAMPLE
+        ```powershell
         $jwt = $tokenString | ConvertFrom-Jwt
         $jwt.Header
         $jwt.Payload
+        ```
 
         Parses a token without verifying it.
 

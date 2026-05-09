@@ -18,12 +18,16 @@
         `[pscustomobject]` describing the per-check outcome.
 
         .EXAMPLE
-        $tokenString | Test-Jwt -Key $publicPem -Issuer 'https://example.com' -Audience 'api'
+        ```powershell
+        $tokenString | Test-Jwt -Key $publicPem -Issuer 'myapp' -Audience 'api://myapi'
+        ```
 
         Returns `$true` if signature and claims validate.
 
         .EXAMPLE
+        ```powershell
         Test-Jwt -Token $tokenString -Key $publicPem -Detailed
+        ```
 
         Returns a structured result describing every check.
 
