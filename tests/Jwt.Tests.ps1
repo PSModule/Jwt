@@ -7,8 +7,9 @@ param()
 
 Describe 'Data-driven tests' {
     BeforeAll {
-        $script:ModuleManifest = Join-Path $PSScriptRoot '../src/JWT.psd1'
-        Import-Module -Name $script:ModuleManifest -Force
+        $script:ModulePath = Join-Path $PSScriptRoot '../src/JWT.psm1'
+        $script:SourceManifest = Join-Path $PSScriptRoot '../src/manifest.psd1'
+        Import-Module -Name $script:ModulePath -Force
     }
 
     AfterAll {
@@ -18,14 +19,13 @@ Describe 'Data-driven tests' {
     $testCases = . "$PSScriptRoot/Data/TestCases.ps1"
 
     Context 'Module metadata' {
-        It 'publishes the maintained Jwt continuation metadata' {
-            $manifest = Import-PowerShellDataFile -Path $script:ModuleManifest
+        It 'provides Process-PSModule source metadata' {
+            $manifest = Import-PowerShellDataFile -Path $script:SourceManifest
 
-            $manifest.ModuleVersion.ToString() | Should -Be '1.9.2'
-            $manifest.RootModule | Should -Be 'JWT.psm1'
-            $manifest.GUID | Should -Be 'd4592298-b1a3-4a7d-b6fc-2ac16cc0e722'
-            $manifest.PrivateData.PSData.ProjectUri | Should -Be 'https://github.com/PSModule/Jwt'
-            $manifest.PrivateData.PSData.LicenseUri | Should -Be 'https://github.com/PSModule/Jwt/blob/main/LICENSE'
+            $manifest.PrivateData.PSData.Tags | Should -Contain 'JWT'
+            $manifest.PrivateData.PSData.Tags | Should -Contain 'JSONWebToken'
+            $manifest.PrivateData.PSData.Tags | Should -Contain 'JWS'
+            $manifest.PrivateData.PSData.Tags | Should -Contain 'PowerShell'
         }
 
         It 'exports the current Jwt command surface' {
