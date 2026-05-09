@@ -5,7 +5,7 @@
 [CmdletBinding()]
 param()
 
-øDescribe 'Data-driven tests' {
+Describe 'Data-driven tests' {
     $testCases = . "$PSScriptRoot/Data/TestCases.ps1"
 
     Context '<Name>' -ForEach $testCases {
