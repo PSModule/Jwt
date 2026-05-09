@@ -120,7 +120,7 @@ String. Get-JwtHeader returns decoded header part of the JWT.
 
 .EXAMPLE
 
-PS Variable:> $jwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJqb2UiLCJyb2xlIjoiYWRtaW4ifQ.'
+PS Variable:> $jwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJqb2UiLCJyb2xlIjoiYWRtaW4ifQ.' #gitleaks:allow
 PS Variable:> Get-JwtHeader $jwt
 {"alg":"none","typ":"JWT"}
 
