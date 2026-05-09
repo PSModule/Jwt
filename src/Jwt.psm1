@@ -444,3 +444,4 @@ https://jwt.io/
 
 
 Set-Alias -Name 'Verify-JwtSignature' -Value 'Test-Jwt' -Description 'An alias, using non-standard verb'
+Export-Member -Function '*' -Alias '*'
