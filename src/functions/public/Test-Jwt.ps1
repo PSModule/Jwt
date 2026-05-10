@@ -31,7 +31,7 @@ function Test-Jwt {
         The Verify-JwtSignature alias is preserved for compatibility with the original module command surface.
 
         .LINK
-        https://github.com/SP3269/posh-jwt
+        https://psmodule.io/Jwt/Functions/Test-Jwt/
 
         .LINK
         https://jwt.io/
@@ -77,9 +77,8 @@ function Test-Jwt {
                 }
                 $bytes = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
                 Write-Verbose "Using certificate with subject: $($Cert.Subject)"
-                $sha256 = New-Object Security.Cryptography.SHA256Managed
                 $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
-                $computed = $sha256.ComputeHash($signedContent)
+                $computed = [System.Security.Cryptography.SHA256]::HashData($signedContent)
                 $cert.PublicKey.Key.VerifyHash(
                     $computed,
                     $bytes,
@@ -91,18 +90,19 @@ function Test-Jwt {
                 if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
                     throw 'HS256 requires -Secret parameter'
                 }
-                $hmacsha256 = New-Object System.Security.Cryptography.HMACSHA256
-                if ($Secret -is [byte[]]) {
-                    $hmacsha256.Key = $Secret
-                } elseif ($Secret -is [string]) {
-                    $hmacsha256.Key = [System.Text.Encoding]::UTF8.GetBytes($Secret)
-                } else {
-                    throw "Expected Secret parameter as byte array or string, instead got $($Secret.GetType())"
+                if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
+                    throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())")
                 }
-                $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
-                $signature = $hmacsha256.ComputeHash($signedContent)
-                $encoded = ConvertTo-Base64UrlString $signature
-                $encoded -eq $parts[2]
+                $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
+                try {
+                    $hmacsha256.Key = if ($Secret -is [byte[]]) { $Secret } else { [System.Text.Encoding]::UTF8.GetBytes($Secret) }
+                    $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
+                    $signature = $hmacsha256.ComputeHash($signedContent)
+                    $encoded = ConvertTo-Base64UrlString $signature
+                    $encoded -eq $parts[2]
+                } finally {
+                    $hmacsha256.Dispose()
+                }
             }
             'none' {
                 -not $parts[2]

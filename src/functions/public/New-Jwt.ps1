@@ -36,7 +36,7 @@
         RS256 requires a certificate with a private key. HS256 requires a string or byte array secret.
 
         .LINK
-        https://github.com/SP3269/posh-jwt
+        https://psmodule.io/Jwt/Functions/New-Jwt/
 
         .LINK
         https://jwt.io/
@@ -119,18 +119,17 @@
                 if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
                     throw 'HS256 requires -Secret parameter'
                 }
+                if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
+                    throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())")
+                }
+                $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
                 try {
-                    $hmacsha256 = New-Object System.Security.Cryptography.HMACSHA256
-                    if ($Secret -is [byte[]]) {
-                        $hmacsha256.Key = $Secret
-                    } elseif ($Secret -is [string]) {
-                        $hmacsha256.Key = [System.Text.Encoding]::UTF8.GetBytes($Secret)
-                    } else {
-                        throw "Expected Secret parameter as byte array or string, instead got $($Secret.GetType())"
-                    }
+                    $hmacsha256.Key = if ($Secret -is [byte[]]) { $Secret } else { [System.Text.Encoding]::UTF8.GetBytes($Secret) }
                     $encodedSignature = ConvertTo-Base64UrlString $hmacsha256.ComputeHash($contentBytes)
                 } catch {
                     throw [System.Exception]::new("Signing with HMACSHA256 failed: $_", $_.Exception)
+                } finally {
+                    $hmacsha256.Dispose()
                 }
             }
             'none' {

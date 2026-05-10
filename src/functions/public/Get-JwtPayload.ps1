@@ -23,7 +23,7 @@
         This command decodes only the payload segment and does not validate the token signature.
 
         .LINK
-        https://github.com/SP3269/posh-jwt
+        https://psmodule.io/Jwt/Functions/Get-JwtPayload/
 
         .LINK
         https://jwt.io/

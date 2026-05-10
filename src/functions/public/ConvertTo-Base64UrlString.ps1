@@ -24,7 +24,7 @@
         Converts standard base64 output to JWT-safe base64url text by replacing URL-sensitive characters and removing padding.
 
         .LINK
-        https://github.com/SP3269/posh-jwt
+        https://psmodule.io/Jwt/Functions/ConvertTo-Base64UrlString/
 
         .LINK
         https://jwt.io/
@@ -48,7 +48,7 @@
         } elseif ($InputObject -is [byte[]]) {
             [Convert]::ToBase64String($InputObject) -replace '\+', '-' -replace '/', '_' -replace '='
         } else {
-            throw "ConvertTo-Base64UrlString requires string or byte array input, received $($InputObject.GetType())"
+            throw [System.ArgumentException]::new("ConvertTo-Base64UrlString requires string or byte array input, received $($InputObject.GetType())")
         }
     }
 

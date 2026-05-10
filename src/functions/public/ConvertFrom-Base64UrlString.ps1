@@ -24,7 +24,7 @@
         Converts JWT-safe base64url text by restoring standard base64 characters and padding before decoding.
 
         .LINK
-        https://github.com/SP3269/posh-jwt
+        https://psmodule.io/Jwt/Functions/ConvertFrom-Base64UrlString/
 
         .LINK
         https://jwt.io/
@@ -47,7 +47,7 @@
     process {
         $base64String = $Base64UrlString.Replace('-', '+').Replace('_', '/')
         switch ($base64String.Length % 4) {
-            0 { $base64String = $base64String }
+            0 { }
             1 { $base64String = $base64String.Substring(0, $base64String.Length - 1) }
             2 { $base64String = $base64String + '==' }
             3 { $base64String = $base64String + '=' }
