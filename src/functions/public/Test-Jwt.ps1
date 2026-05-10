@@ -75,7 +75,7 @@ function Test-Jwt {
         try {
             $algorithm = (ConvertFrom-Json -InputObject $header -ErrorAction Stop).alg
         } catch {
-            throw "The supplied JWT header is not JSON: $header"
+            throw [System.FormatException]::new("The supplied JWT header segment is not valid JSON. Header length: $($header.Length) characters.")
         }
         Write-Verbose "Algorithm: $algorithm"
 
@@ -83,6 +83,9 @@ function Test-Jwt {
             'RS256' {
                 if (-not $PSBoundParameters.ContainsKey('Cert')) {
                     throw 'RS256 requires -Cert parameter of type System.Security.Cryptography.X509Certificates.X509Certificate2'
+                }
+                if ([string]::IsNullOrEmpty($parts[2])) {
+                    return $false
                 }
                 $bytes = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
                 Write-Verbose "Using certificate with subject: $($Cert.Subject)"

@@ -77,14 +77,14 @@
         try {
             $algorithm = (ConvertFrom-Json -InputObject $Header -ErrorAction Stop).alg
         } catch {
-            throw "The supplied JWT header is not JSON: $Header"
+            throw [System.FormatException]::new("The supplied JWT header is not valid JSON. Header length: $($Header.Length) characters.")
         }
         Write-Verbose "Algorithm: $algorithm"
 
         try {
             $null = ConvertFrom-Json -InputObject $PayloadJson -ErrorAction Stop
         } catch {
-            throw "The supplied JWT payload is not JSON: $PayloadJson"
+            throw [System.FormatException]::new("The supplied JWT payload is not valid JSON. Payload length: $($PayloadJson.Length) characters.")
         }
 
         $encodedHeader = ConvertTo-Base64UrlString $Header
