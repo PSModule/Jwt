@@ -82,7 +82,9 @@ Describe 'Data-driven tests' {
         }
 
         It 'New-Jwt - requires the payload to be valid JSON' {
-            { New-Jwt -Header '{"alg":"HS256","typ":"JWT"}' -PayloadJson 'not-json' -Secret 'super-secret' } | Should -Throw '*payload is not valid JSON*'
+            $header = '{"alg":"HS256","typ":"JWT"}'
+            { New-Jwt -Header $header -PayloadJson 'not-json' -Secret 'super-secret' } |
+                Should -Throw '*payload is not valid JSON*'
         }
 
         It 'Get-JwtHeader - requires exactly three JWT segments' {
