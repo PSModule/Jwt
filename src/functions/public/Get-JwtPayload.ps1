@@ -1,41 +1,49 @@
 ﻿function Get-JwtPayload {
     <#
-.SYNOPSIS
-Gets JSON payload from a JWT (JSON Web Token).
+        .SYNOPSIS
+        Gets the decoded payload from a JWT.
 
-.DESCRIPTION
-Decodes and extracts JSON payload from JWT. Ignores headers and signature.
+        .DESCRIPTION
+        Decodes and returns the JSON payload segment from a JSON Web Token. The header and signature are ignored.
 
-.PARAMETER jwt
-Specifies the JWT. Mandatory string.
+        .EXAMPLE
+        ```powershell
+        $jwt | Get-JwtPayload
+        ```
 
-.INPUTS
-You can pipe JWT as a string object to Get-JwtPayload.
+        Gets the decoded payload JSON from a JWT.
 
-.OUTPUTS
-String. Get-JwtPayload returns decoded payload part of the JWT.
+        .INPUTS
+        System.String
 
-.EXAMPLE
+        .OUTPUTS
+        System.String
 
-PS Variable:> $jwt | Get-JwtPayload
-{"token1":"value1","token2":"value2"}
+        .NOTES
+        This command decodes only the payload segment and does not validate the token signature.
 
-.LINK
-https://github.com/SP3269/posh-jwt
-.LINK
-https://jwt.io/
+        .LINK
+        https://github.com/SP3269/posh-jwt
 
-#>
-
-    [CmdletBinding()]
+        .LINK
+        https://jwt.io/
+    #>
     [OutputType([string])]
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)][string]$jwt
+    [CmdletBinding()]
+    param(
+        # The JWT to read.
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Jwt
     )
 
+    begin {}
+
     process {
-        Write-Verbose "Processing JWT: $jwt"
-        $parts = $jwt.Split('.')
+        Write-Verbose "Processing JWT: $Jwt"
+        $parts = $Jwt.Split('.')
         ConvertFrom-Base64UrlString $parts[1]
     }
+
+    end {}
 }

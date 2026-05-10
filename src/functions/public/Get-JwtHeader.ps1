@@ -1,42 +1,50 @@
 ﻿function Get-JwtHeader {
     <#
-.SYNOPSIS
-Gets JSON payload from a JWT (JSON Web Token).
+        .SYNOPSIS
+        Gets the decoded header from a JWT.
 
-.DESCRIPTION
-Decodes and extracts JSON header from JWT. Ignores payload and signature.
+        .DESCRIPTION
+        Decodes and returns the JSON header segment from a JSON Web Token. The payload and signature are ignored.
 
-.PARAMETER jwt
-Specifies the JWT. Mandatory string.
+        .EXAMPLE
+        ```powershell
+        $jwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJqb2UiLCJyb2xlIjoiYWRtaW4ifQ.' #gitleaks:allow
+        Get-JwtHeader -Jwt $jwt
+        ```
 
-.INPUTS
-You can pipe JWT as a string object to Get-JwtHeader.
+        Gets the decoded header JSON from an unsigned JWT.
 
-.OUTPUTS
-String. Get-JwtHeader returns decoded header part of the JWT.
+        .INPUTS
+        System.String
 
-.EXAMPLE
+        .OUTPUTS
+        System.String
 
-PS Variable:> $jwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJqb2UiLCJyb2xlIjoiYWRtaW4ifQ.' #gitleaks:allow
-PS Variable:> Get-JwtHeader $jwt
-{"alg":"none","typ":"JWT"}
+        .NOTES
+        This command decodes only the header segment and does not validate the token signature.
 
-.LINK
-https://github.com/SP3269/posh-jwt
-.LINK
-https://jwt.io/
+        .LINK
+        https://github.com/SP3269/posh-jwt
 
-#>
-
-    [CmdletBinding()]
+        .LINK
+        https://jwt.io/
+    #>
     [OutputType([string])]
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)][string]$jwt
+    [CmdletBinding()]
+    param(
+        # The JWT to read.
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Jwt
     )
 
+    begin {}
+
     process {
-        Write-Verbose "Processing JWT: $jwt"
-        $parts = $jwt.Split('.')
+        Write-Verbose "Processing JWT: $Jwt"
+        $parts = $Jwt.Split('.')
         ConvertFrom-Base64UrlString $parts[0]
     }
+
+    end {}
 }

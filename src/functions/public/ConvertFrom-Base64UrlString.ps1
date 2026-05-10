@@ -1,43 +1,51 @@
 ﻿function ConvertFrom-Base64UrlString {
     <#
-.SYNOPSIS
-Base64url decoder.
+        .SYNOPSIS
+        Decodes a base64url string.
 
-.DESCRIPTION
-Decodes base64url-encoded string to the original string or byte array.
+        .DESCRIPTION
+        Decodes a base64url-encoded string to UTF-8 text by default. Use AsByteArray to return the decoded bytes.
 
-.PARAMETER Base64UrlString
-Specifies the encoded input. Mandatory string.
+        .EXAMPLE
+        ```powershell
+        'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9' | ConvertFrom-Base64UrlString
+        ```
 
-.PARAMETER AsByteArray
-Optional switch. If specified, outputs byte array instead of string.
+        Decodes the base64url value to `{"alg":"RS256","typ":"JWT"}`.
 
-.INPUTS
-You can pipe the string input to ConvertFrom-Base64UrlString.
+        .INPUTS
+        System.String
 
-.OUTPUTS
-ConvertFrom-Base64UrlString returns decoded string by default, or the bytes if -AsByteArray is used.
+        .OUTPUTS
+        System.String
+        System.Byte[]
 
-.EXAMPLE
+        .NOTES
+        Converts JWT-safe base64url text by restoring standard base64 characters and padding before decoding.
 
-PS Variable:> 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9' | ConvertFrom-Base64UrlString
-{"alg":"RS256","typ":"JWT"}
+        .LINK
+        https://github.com/SP3269/posh-jwt
 
-.LINK
-https://github.com/SP3269/posh-jwt
-.LINK
-https://jwt.io/
-
-#>
-    [CmdletBinding()]
+        .LINK
+        https://jwt.io/
+    #>
     [OutputType([string], [byte[]])]
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)][string]$Base64UrlString,
-        [Parameter(Mandatory = $false)][switch]$AsByteArray
+    [CmdletBinding()]
+    param(
+        # The base64url-encoded string to decode.
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Base64UrlString,
+
+        # Return decoded bytes instead of UTF-8 text.
+        [Parameter()]
+        [switch] $AsByteArray
     )
 
+    begin {}
+
     process {
-        $base64String = $Base64UrlString.replace('-', '+').replace('_', '/')
+        $base64String = $Base64UrlString.Replace('-', '+').Replace('_', '/')
         switch ($base64String.Length % 4) {
             0 { $base64String = $base64String }
             1 { $base64String = $base64String.Substring(0, $base64String.Length - 1) }
@@ -50,4 +58,6 @@ https://jwt.io/
             [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($base64String))
         }
     }
+
+    end {}
 }

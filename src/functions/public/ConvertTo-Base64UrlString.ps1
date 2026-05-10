@@ -1,46 +1,56 @@
 ﻿function ConvertTo-Base64UrlString {
     <#
-.SYNOPSIS
-Base64url encoder.
+        .SYNOPSIS
+        Encodes text or bytes as a base64url string.
 
-.DESCRIPTION
-Encodes a string or byte array to base64url-encoded string.
+        .DESCRIPTION
+        Encodes a string or byte array using base64url encoding suitable for JWT headers, payloads, and signatures.
 
-.PARAMETER in
-Specifies the input. Must be string, or byte array.
+        .EXAMPLE
+        ```powershell
+        '{"alg":"RS256","typ":"JWT"}' | ConvertTo-Base64UrlString
+        ```
 
-.INPUTS
-You can pipe the string input to ConvertTo-Base64UrlString.
+        Encodes the JWT header JSON as `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9`.
 
-.OUTPUTS
-ConvertTo-Base64UrlString returns the encoded string by default.
+        .INPUTS
+        System.String
+        System.Byte[]
 
-.EXAMPLE
+        .OUTPUTS
+        System.String
 
-PS Variable:> '{"alg":"RS256","typ":"JWT"}' | ConvertTo-Base64UrlString
-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9
+        .NOTES
+        Converts standard base64 output to JWT-safe base64url text by replacing URL-sensitive characters and removing padding.
 
-.LINK
-https://github.com/SP3269/posh-jwt
-.LINK
-https://jwt.io/
+        .LINK
+        https://github.com/SP3269/posh-jwt
 
-#>
-    [CmdletBinding()]
+        .LINK
+        https://jwt.io/
+    #>
     [OutputType([string])]
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [object]$in
+    [CmdletBinding()]
+    param(
+        # The string or byte array to encode.
+        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        [ValidateNotNull()]
+        [Alias('in')]
+        [object] $InputObject
     )
 
+    begin {}
+
     process {
-        if ($in -is [string]) {
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($in)
+        if ($InputObject -is [string]) {
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($InputObject)
             [Convert]::ToBase64String($bytes) -replace '\+', '-' -replace '/', '_' -replace '='
-        } elseif ($in -is [byte[]]) {
-            [Convert]::ToBase64String($in) -replace '\+', '-' -replace '/', '_' -replace '='
+        } elseif ($InputObject -is [byte[]]) {
+            [Convert]::ToBase64String($InputObject) -replace '\+', '-' -replace '/', '_' -replace '='
         } else {
-            throw "ConvertTo-Base64UrlString requires string or byte array input, received $($in.GetType())"
+            throw "ConvertTo-Base64UrlString requires string or byte array input, received $($InputObject.GetType())"
         }
     }
+
+    end {}
 }
