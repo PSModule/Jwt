@@ -40,8 +40,14 @@
     begin {}
 
     process {
-        Write-Verbose "Processing JWT: $Jwt"
+        Write-Verbose "Processing JWT with length $($Jwt.Length) characters"
         $parts = $Jwt.Split('.')
+        if ($parts.Count -ne 3) {
+            throw [System.ArgumentException]::new('JWT must have exactly 3 segments.')
+        }
+        if (-not $parts[1]) {
+            throw [System.ArgumentException]::new('JWT payload segment is missing.')
+        }
         ConvertFrom-Base64UrlString $parts[1]
     }
 

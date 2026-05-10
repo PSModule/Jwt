@@ -72,7 +72,7 @@
     begin {}
 
     process {
-        Write-Verbose "Payload to sign: $PayloadJson"
+        Write-Verbose "Payload to sign length: $($PayloadJson.Length) characters"
 
         try {
             $algorithm = (ConvertFrom-Json -InputObject $Header -ErrorAction Stop).alg
@@ -98,7 +98,7 @@
                     throw 'RS256 requires -Cert parameter of type System.Security.Cryptography.X509Certificates.X509Certificate2'
                 }
                 Write-Verbose "Signing certificate: $($Cert.Subject)"
-                $rsa = $Cert.PrivateKey
+                $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Cert)
                 if ($null -eq $rsa) {
                     throw "There's no private key in the supplied certificate - cannot sign"
                 } else {
@@ -110,8 +110,10 @@
                         )
                         $encodedSignature = ConvertTo-Base64UrlString $signature
                     } catch {
-                        $message = "Signing with SHA256 and Pkcs1 padding failed using private key $($rsa): $_"
+                        $message = "Signing with SHA256 and Pkcs1 padding failed using the certificate private key: $_"
                         throw [System.Exception]::new($message, $_.Exception)
+                    } finally {
+                        $rsa.Dispose()
                     }
                 }
             }

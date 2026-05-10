@@ -66,6 +66,10 @@ Describe 'Data-driven tests' {
             [System.Text.Encoding]::UTF8.GetString($bytes) | Should -Be 'Hello'
         }
 
+        It 'ConvertFrom-Base64UrlString - rejects invalid base64url length' {
+            { ConvertFrom-Base64UrlString 'A' } | Should -Throw '*Invalid base64url string length*'
+        }
+
         It 'ConvertTo-Base64UrlString - throws for unsupported input types' {
             { ConvertTo-Base64UrlString ([pscustomobject]@{ Value = 'invalid' }) } | Should -Throw '*requires string or byte array input*'
         }
@@ -79,6 +83,56 @@ Describe 'Data-driven tests' {
 
         It 'New-Jwt - requires the payload to be valid JSON' {
             { New-Jwt -Header '{"alg":"HS256","typ":"JWT"}' -PayloadJson 'not-json' -Secret 'super-secret' } | Should -Throw '*payload is not JSON*'
+        }
+
+        It 'Get-JwtHeader - requires exactly three JWT segments' {
+            { Get-JwtHeader 'header.payload' } | Should -Throw '*JWT must have exactly 3 segments*'
+        }
+
+        It 'Get-JwtPayload - requires a payload segment' {
+            { Get-JwtPayload 'header..signature' } | Should -Throw '*JWT payload segment is missing*'
+        }
+
+        It 'Test-Jwt - requires exactly three JWT segments' {
+            { Test-Jwt 'header.payload' } | Should -Throw '*JWT must have exactly 3 segments*'
+        }
+
+        It 'Test-Jwt - rejects unsigned tokens without a third segment' {
+            $header = ConvertTo-Base64UrlString '{"alg":"none","typ":"JWT"}'
+            $payload = ConvertTo-Base64UrlString '{"sub":"joe","role":"admin"}'
+
+            { Test-Jwt "$header.$payload" } | Should -Throw '*JWT must have exactly 3 segments*'
+        }
+
+        It 'Test-Jwt - returns false for an invalid HS256 signature segment' {
+            $jwt = New-Jwt -Header '{"alg":"HS256","typ":"JWT"}' -PayloadJson '{"sub":"joe","role":"admin"}' -Secret 'super-secret'
+            $parts = $jwt.Split('.')
+            $parts[2] = 'A'
+
+            Test-Jwt -jwt ($parts -join '.') -Secret 'super-secret' | Should -BeFalse
+        }
+
+        It 'Verbose output does not include JWT or payload values' {
+            $payload = '{"sub":"joe","role":"admin"}'
+            $jwt = New-Jwt -Header '{"alg":"HS256","typ":"JWT"}' -PayloadJson $payload -Secret 'super-secret'
+
+            $newJwtVerbose = & { New-Jwt -Header '{"alg":"HS256","typ":"JWT"}' -PayloadJson $payload -Secret 'super-secret' -Verbose } 4>&1 |
+                Where-Object { $_.GetType().Name -eq 'VerboseRecord' } |
+                Out-String
+            $getHeaderVerbose = & { Get-JwtHeader $jwt -Verbose } 4>&1 |
+                Where-Object { $_.GetType().Name -eq 'VerboseRecord' } |
+                Out-String
+            $getPayloadVerbose = & { Get-JwtPayload $jwt -Verbose } 4>&1 |
+                Where-Object { $_.GetType().Name -eq 'VerboseRecord' } |
+                Out-String
+            $testJwtVerbose = & { Test-Jwt -jwt $jwt -Secret 'super-secret' -Verbose } 4>&1 |
+                Where-Object { $_.GetType().Name -eq 'VerboseRecord' } |
+                Out-String
+
+            $newJwtVerbose | Should -Not -Match ([regex]::Escape($payload))
+            $getHeaderVerbose | Should -Not -Match ([regex]::Escape($jwt))
+            $getPayloadVerbose | Should -Not -Match ([regex]::Escape($jwt))
+            $testJwtVerbose | Should -Not -Match ([regex]::Escape($jwt))
         }
     }
 }

@@ -59,9 +59,18 @@ function Test-Jwt {
     begin {}
 
     process {
-        Write-Verbose "Verifying JWT: $Jwt"
+        Write-Verbose "Verifying JWT with length $($Jwt.Length) characters"
 
         $parts = $Jwt.Split('.')
+        if ($parts.Count -ne 3) {
+            throw [System.ArgumentException]::new('JWT must have exactly 3 segments.')
+        }
+        if (-not $parts[0]) {
+            throw [System.ArgumentException]::new('JWT header segment is missing.')
+        }
+        if (-not $parts[1]) {
+            throw [System.ArgumentException]::new('JWT payload segment is missing.')
+        }
         $header = ConvertFrom-Base64UrlString $parts[0]
         try {
             $algorithm = (ConvertFrom-Json -InputObject $header -ErrorAction Stop).alg
@@ -79,12 +88,20 @@ function Test-Jwt {
                 Write-Verbose "Using certificate with subject: $($Cert.Subject)"
                 $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
                 $computed = [System.Security.Cryptography.SHA256]::HashData($signedContent)
-                $cert.PublicKey.Key.VerifyHash(
-                    $computed,
-                    $bytes,
-                    [Security.Cryptography.HashAlgorithmName]::SHA256,
-                    [Security.Cryptography.RSASignaturePadding]::Pkcs1
-                )
+                $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($Cert)
+                if ($null -eq $rsa) {
+                    throw "There's no RSA public key in the supplied certificate - cannot verify"
+                }
+                try {
+                    $rsa.VerifyHash(
+                        $computed,
+                        $bytes,
+                        [Security.Cryptography.HashAlgorithmName]::SHA256,
+                        [Security.Cryptography.RSASignaturePadding]::Pkcs1
+                    )
+                } finally {
+                    $rsa.Dispose()
+                }
             }
             'HS256' {
                 if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
@@ -98,14 +115,30 @@ function Test-Jwt {
                     $hmacsha256.Key = if ($Secret -is [byte[]]) { $Secret } else { [System.Text.Encoding]::UTF8.GetBytes($Secret) }
                     $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
                     $signature = $hmacsha256.ComputeHash($signedContent)
-                    $encoded = ConvertTo-Base64UrlString $signature
-                    $encoded -eq $parts[2]
+                    if (-not $parts[2]) {
+                        $false
+                    } else {
+                        try {
+                            $providedSignature = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
+                        } catch [System.FormatException] {
+                            $providedSignature = $null
+                        }
+                        if ($null -eq $providedSignature -or $signature.Length -ne $providedSignature.Length) {
+                            $false
+                        } else {
+                            $difference = 0
+                            for ($index = 0; $index -lt $signature.Length; $index++) {
+                                $difference = $difference -bor ($signature[$index] -bxor $providedSignature[$index])
+                            }
+                            $difference -eq 0
+                        }
+                    }
                 } finally {
                     $hmacsha256.Dispose()
                 }
             }
             'none' {
-                -not $parts[2]
+                $parts[2] -eq ''
             }
             default {
                 throw 'The algorithm is not one of the supported: "RS256", "HS256", "none"'

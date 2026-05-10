@@ -48,7 +48,7 @@
         $base64String = $Base64UrlString.Replace('-', '+').Replace('_', '/')
         switch ($base64String.Length % 4) {
             0 { }
-            1 { $base64String = $base64String.Substring(0, $base64String.Length - 1) }
+            1 { throw [System.FormatException]::new('Invalid base64url string length.') }
             2 { $base64String = $base64String + '==' }
             3 { $base64String = $base64String + '=' }
         }
