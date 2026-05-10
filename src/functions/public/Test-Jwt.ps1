@@ -82,18 +82,22 @@ function Test-Jwt {
         switch ($algorithm) {
             'RS256' {
                 if (-not $PSBoundParameters.ContainsKey('Cert')) {
-                    throw 'RS256 requires -Cert parameter of type System.Security.Cryptography.X509Certificates.X509Certificate2'
+                    throw [System.ArgumentException]::new('RS256 requires a -Cert parameter of type X509Certificate2.', 'Cert')
                 }
                 if ([string]::IsNullOrEmpty($parts[2])) {
                     return $false
                 }
-                $bytes = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
+                try {
+                    $bytes = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
+                } catch [System.FormatException] {
+                    return $false
+                }
                 Write-Verbose "Using certificate with subject: $($Cert.Subject)"
                 $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
                 $computed = [System.Security.Cryptography.SHA256]::HashData($signedContent)
                 $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($Cert)
                 if ($null -eq $rsa) {
-                    throw "There's no RSA public key in the supplied certificate - cannot verify"
+                    throw [System.ArgumentException]::new('The supplied certificate has no RSA public key and cannot be used to verify.', 'Cert')
                 }
                 try {
                     $rsa.VerifyHash(
@@ -108,7 +112,7 @@ function Test-Jwt {
             }
             'HS256' {
                 if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
-                    throw 'HS256 requires -Secret parameter'
+                    throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
                 }
                 if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
                     throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())")
@@ -144,7 +148,7 @@ function Test-Jwt {
                 $parts[2] -eq ''
             }
             default {
-                throw 'The algorithm is not one of the supported: "RS256", "HS256", "none"'
+                throw [System.NotSupportedException]::new('The algorithm is not one of the supported: "RS256", "HS256", "none".')
             }
         }
     }

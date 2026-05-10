@@ -55,7 +55,7 @@ Describe 'Data-driven tests' {
         }
 
         It 'New-Jwt - requires a secret' {
-            { New-Jwt -Header $Header -PayloadJson $Payload } | Should -Throw '*HS256 requires -Secret parameter*'
+            { New-Jwt -Header $Header -PayloadJson $Payload } | Should -Throw '*HS256 requires*Secret*'
         }
     }
 

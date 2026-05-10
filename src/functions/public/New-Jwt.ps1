@@ -95,12 +95,12 @@
         switch ($algorithm) {
             'RS256' {
                 if (-not $PSBoundParameters.ContainsKey('Cert')) {
-                    throw 'RS256 requires -Cert parameter of type System.Security.Cryptography.X509Certificates.X509Certificate2'
+                    throw [System.ArgumentException]::new('RS256 requires a -Cert parameter of type X509Certificate2.', 'Cert')
                 }
                 Write-Verbose "Signing certificate: $($Cert.Subject)"
                 $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Cert)
                 if ($null -eq $rsa) {
-                    throw "There's no private key in the supplied certificate - cannot sign"
+                    throw [System.ArgumentException]::new('The supplied certificate has no RSA private key and cannot be used to sign.', 'Cert')
                 } else {
                     try {
                         $signature = $rsa.SignData(
@@ -119,7 +119,7 @@
             }
             'HS256' {
                 if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
-                    throw 'HS256 requires -Secret parameter'
+                    throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
                 }
                 if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
                     throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())")
@@ -138,7 +138,7 @@
                 $encodedSignature = $null
             }
             default {
-                throw 'The algorithm is not one of the supported: "RS256", "HS256", "none"'
+                throw [System.NotSupportedException]::new('The algorithm is not one of the supported: "RS256", "HS256", "none".')
             }
         }
 
