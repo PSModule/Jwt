@@ -1,53 +1,54 @@
-# {{ NAME }}
+# Jwt
 
-{{ DESCRIPTION }}
-
-## Prerequisites
-
-This uses the following external resources:
-- The [PSModule framework](https://github.com/PSModule/Process-PSModule) for building, testing and publishing the module.
+`Jwt` is a PowerShell module for creating and verifying JSON Web Tokens. This repository maintains the current `Jwt` module command surface under PSModule maintenance so existing users can continue to install and use the package from PowerShell Gallery.
 
 ## Installation
 
-To install the module from the PowerShell Gallery, you can use the following command:
+```powershell
+Install-PSResource -Name Jwt
+Import-Module -Name Jwt
+```
+
+## Commands
+
+The maintained module exports the same JWT commands and alias used by the current package:
 
 ```powershell
-Install-PSResource -Name {{ NAME }}
-Import-Module -Name {{ NAME }}
+ConvertFrom-Base64UrlString
+ConvertTo-Base64UrlString
+Get-JwtHeader
+Get-JwtPayload
+New-Jwt
+Test-Jwt
+Verify-JwtSignature
 ```
 
 ## Usage
 
-Here is a list of example that are typical use cases for the module.
-
-### Example 1: Greet an entity
-
-Provide examples for typical commands that a user would like to do with the module.
+Create and validate an HMAC-signed JWT:
 
 ```powershell
-Greet-Entity -Name 'World'
-Hello, World!
+$header = '{"alg":"HS256","typ":"JWT"}'
+$payload = '{"sub":"1234567890","name":"John Doe","admin":true,"iat":1516239022}'
+$secret = 'a-string-secret-at-least-256-bits-long'
+
+$jwt = New-Jwt -Header $header -PayloadJson $payload -Secret $secret
+Test-Jwt -jwt $jwt -Secret $secret
 ```
 
-### Example 2
-
-Provide examples for typical commands that a user would like to do with the module.
+Read the header and payload from an existing token:
 
 ```powershell
-Import-Module -Name PSModuleTemplate
+Get-JwtHeader -jwt $jwt
+Get-JwtPayload -jwt $jwt
 ```
 
-### Find more examples
+For more information about each command, use PowerShell help:
 
-To find more examples of how to use the module, please refer to the [examples](examples) folder.
-
-Alternatively, you can use the Get-Command -Module 'This module' to find more commands that are available in the module.
-To find examples of each of the commands you can use Get-Help -Examples 'CommandName'.
-
-## Documentation
-
-Link to further documentation if available, or describe where in the repository users can find more detailed documentation about
-the module's functions and features.
+```powershell
+Get-Command -Module Jwt
+Get-Help New-Jwt -Full
+```
 
 ## Contributing
 
