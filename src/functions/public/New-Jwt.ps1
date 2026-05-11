@@ -77,7 +77,8 @@
         try {
             $algorithm = (ConvertFrom-Json -InputObject $Header -ErrorAction Stop).alg
         } catch {
-            throw [System.FormatException]::new("The supplied JWT header is not valid JSON. Header length: $($Header.Length) characters.")
+            $message = "The supplied JWT header is not valid JSON. Header length: $($Header.Length) characters."
+            throw [System.FormatException]::new($message)
         }
         if ([string]::IsNullOrEmpty($algorithm)) {
             throw [System.FormatException]::new('The JWT header is missing the required "alg" claim.')
@@ -87,7 +88,8 @@
         try {
             $null = ConvertFrom-Json -InputObject $PayloadJson -ErrorAction Stop
         } catch {
-            throw [System.FormatException]::new("The supplied JWT payload is not valid JSON. Payload length: $($PayloadJson.Length) characters.")
+            $message = "The supplied JWT payload is not valid JSON. Payload length: $($PayloadJson.Length) characters."
+            throw [System.FormatException]::new($message)
         }
 
         $encodedHeader = ConvertTo-Base64UrlString $Header
@@ -98,12 +100,14 @@
         switch ($algorithm) {
             'RS256' {
                 if (-not $PSBoundParameters.ContainsKey('Cert')) {
-                    throw [System.ArgumentException]::new('RS256 requires a -Cert parameter of type X509Certificate2.', 'Cert')
+                    $message = 'RS256 requires a -Cert parameter of type X509Certificate2.'
+                    throw [System.ArgumentException]::new($message, 'Cert')
                 }
                 Write-Verbose "Signing certificate: $($Cert.Subject)"
                 $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Cert)
                 if ($null -eq $rsa) {
-                    throw [System.ArgumentException]::new('The supplied certificate has no RSA private key and cannot be used to sign.', 'Cert')
+                    $message = 'The supplied certificate has no RSA private key and cannot be used to sign.'
+                    throw [System.ArgumentException]::new($message, 'Cert')
                 } else {
                     try {
                         $signature = $rsa.SignData(
@@ -125,11 +129,16 @@
                     throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
                 }
                 if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
-                    throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())", 'Secret')
+                    $message = "Expected Secret parameter as byte array or string, instead got $($Secret.GetType())"
+                    throw [System.ArgumentException]::new($message, 'Secret')
                 }
                 $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
                 try {
-                    $hmacsha256.Key = if ($Secret -is [byte[]]) { $Secret } else { [System.Text.Encoding]::UTF8.GetBytes($Secret) }
+                    $hmacsha256.Key = if ($Secret -is [byte[]]) {
+                        $Secret
+                    } else {
+                        [System.Text.Encoding]::UTF8.GetBytes($Secret)
+                    }
                     $encodedSignature = ConvertTo-Base64UrlString $hmacsha256.ComputeHash($contentBytes)
                 } catch {
                     throw [System.Exception]::new("Signing with HMACSHA256 failed: $_", $_.Exception)
@@ -141,7 +150,8 @@
                 $encodedSignature = $null
             }
             default {
-                throw [System.NotSupportedException]::new('The algorithm is not one of the supported: "RS256", "HS256", "none".')
+                $message = 'The algorithm is not one of the supported: "RS256", "HS256", "none".'
+                throw [System.NotSupportedException]::new($message)
             }
         }
 
