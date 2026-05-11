@@ -77,6 +77,9 @@ function Test-Jwt {
         } catch {
             throw [System.FormatException]::new("The supplied JWT header segment is not valid JSON. Header length: $($header.Length) characters.")
         }
+        if ([string]::IsNullOrEmpty($algorithm)) {
+            throw [System.FormatException]::new('The JWT header is missing the required "alg" claim.')
+        }
         Write-Verbose "Algorithm: $algorithm"
 
         switch ($algorithm) {
@@ -115,7 +118,7 @@ function Test-Jwt {
                     throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
                 }
                 if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
-                    throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())")
+                    throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())", 'Secret')
                 }
                 $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
                 try {

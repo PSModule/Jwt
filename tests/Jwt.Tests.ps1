@@ -87,6 +87,19 @@ Describe 'Data-driven tests' {
                 Should -Throw '*payload is not valid JSON*'
         }
 
+        It 'New-Jwt - rejects a header missing the alg claim' {
+            { New-Jwt -Header '{"typ":"JWT"}' -PayloadJson '{"sub":"joe"}' -Secret 'super-secret' } |
+                Should -Throw '*missing the required "alg" claim*'
+        }
+
+        It 'Test-Jwt - rejects a token with a header missing the alg claim' {
+            $header = ConvertTo-Base64UrlString '{"typ":"JWT"}'
+            $payload = ConvertTo-Base64UrlString '{"sub":"joe"}'
+            $sig = ConvertTo-Base64UrlString 'fakesig'
+            { Test-Jwt "$header.$payload.$sig" -Secret 'super-secret' } |
+                Should -Throw '*missing the required "alg" claim*'
+        }
+
         It 'Get-JwtHeader - requires exactly three JWT segments' {
             { Get-JwtHeader 'header.payload' } | Should -Throw '*JWT must have exactly 3 segments*'
         }
