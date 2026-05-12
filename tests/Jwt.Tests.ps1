@@ -13,14 +13,14 @@ $testCases = . "$PSScriptRoot/Data/TestCases.ps1"
 Describe 'Jwt module' {
     Context 'Data-driven HS256 cases - <Name>' -ForEach $testCases {
         It 'New-Jwt produces a token whose signing input matches the expected encoded segments' {
-            $payloadHash = @{}
+            $payloadHash = [ordered]@{}
             foreach ($k in $Payload.Keys) { $payloadHash[$k] = $Payload[$k] }
-            $headerHash = @{}
+            $headerHash = [ordered]@{}
             foreach ($k in $Header.Keys) { if ($k -ne 'alg') { $headerHash[$k] = $Header[$k] } }
 
             $jwt = New-Jwt -Header $headerHash -Payload $payloadHash -Algorithm $Algorithm -Key $Secret
 
-            $jwt | Should -BeOfType [Jwt]
+            $jwt.GetType().Name | Should -Be 'Jwt'
             $jwt.Header.alg | Should -Be $Algorithm
             $jwt.Header.typ | Should -Be 'JWT'
             if ($EncodedHeader) { $jwt.EncodedHeader | Should -Be $EncodedHeader }
@@ -54,7 +54,7 @@ Describe 'Jwt module' {
         It 'New-Jwt -Unsigned produces a token with empty signature and a trailing dot' {
             $jwt = New-Jwt -Payload @{ sub = 'app' } -Algorithm RS256 -Unsigned
 
-            $jwt | Should -BeOfType [Jwt]
+            $jwt.GetType().Name | Should -Be 'Jwt'
             $jwt.Signature | Should -Be ''
             $jwt.ToString() | Should -Match '\.$'
             $jwt.SigningInput() | Should -Be ($jwt.EncodedHeader + '.' + $jwt.EncodedPayload)
@@ -83,7 +83,7 @@ Describe 'Jwt module' {
 
         It 'New-Jwt ES256 with a generated EC P-256 key round-trips' {
             $ecdsa = [System.Security.Cryptography.ECDsa]::Create(
-                [System.Security.Cryptography.ECCurve]::NamedCurves.nistP256)
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7'))
             try {
                 $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm ES256 -Key $ecdsa
                 Test-Jwt -Token $jwt -Key $ecdsa -RequireExpiration $false | Should -BeTrue
@@ -377,7 +377,7 @@ Describe 'Jwt module' {
 
         It 'round-trips an EC P-256 key through ConvertTo-JwtKey / ConvertFrom-JwtKey' {
             $ecdsa = [System.Security.Cryptography.ECDsa]::Create(
-                [System.Security.Cryptography.ECCurve]::NamedCurves.nistP256)
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7'))
             try {
                 $jwk = ConvertTo-JwtKey -Key $ecdsa -IncludePrivateParameters
                 $jwk.kty | Should -Be 'EC'
@@ -399,6 +399,192 @@ Describe 'Jwt module' {
 
             $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm HS256 -Key $bytes
             Test-Jwt -Token $jwt -Key $jwk -RequireExpiration $false | Should -BeTrue
+        }
+    }
+
+    Context 'JWS algorithm coverage (RFC 7518 §3)' {
+        BeforeAll {
+            $script:secret = 'a-string-secret-at-least-256-bits-long'
+            $script:rsa = [System.Security.Cryptography.RSA]::Create(2048)
+            $script:ec256 = [System.Security.Cryptography.ECDsa]::Create(
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7'))
+            $script:ec384 = [System.Security.Cryptography.ECDsa]::Create(
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.3.132.0.34'))
+            $script:ec521 = [System.Security.Cryptography.ECDsa]::Create(
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.3.132.0.35'))
+        }
+
+        AfterAll {
+            $script:rsa.Dispose()
+            $script:ec256.Dispose()
+            $script:ec384.Dispose()
+            $script:ec521.Dispose()
+        }
+
+        It 'signs and verifies <Alg>' -ForEach @(
+            @{ Alg = 'HS256' },
+            @{ Alg = 'HS384' },
+            @{ Alg = 'HS512' }
+        ) {
+            $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm $Alg -Key $script:secret
+            $jwt.Header.alg | Should -Be $Alg
+            Test-Jwt -Token $jwt -Key $script:secret -RequireExpiration $false | Should -BeTrue
+        }
+
+        It 'signs and verifies <Alg>' -ForEach @(
+            @{ Alg = 'RS256' },
+            @{ Alg = 'RS384' },
+            @{ Alg = 'RS512' },
+            @{ Alg = 'PS256' },
+            @{ Alg = 'PS384' },
+            @{ Alg = 'PS512' }
+        ) {
+            $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm $Alg -Key $script:rsa
+            $jwt.Header.alg | Should -Be $Alg
+            Test-Jwt -Token $jwt -Key $script:rsa -RequireExpiration $false | Should -BeTrue
+        }
+
+        It 'signs and verifies <Alg> with curve <Crv>' -ForEach @(
+            @{ Alg = 'ES256'; Crv = 'P-256'; KeyVar = 'ec256' },
+            @{ Alg = 'ES384'; Crv = 'P-384'; KeyVar = 'ec384' },
+            @{ Alg = 'ES512'; Crv = 'P-521'; KeyVar = 'ec521' }
+        ) {
+            $key = (Get-Variable -Scope Script -Name $KeyVar -ValueOnly)
+            $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm $Alg -Key $key
+            $jwt.Header.alg | Should -Be $Alg
+            Test-Jwt -Token $jwt -Key $key -RequireExpiration $false | Should -BeTrue
+        }
+
+        It 'rejects an EC key whose curve does not match the algorithm' {
+            { New-Jwt -Payload @{ sub = 'x' } -Algorithm ES384 -Key $script:ec256 } |
+                Should -Throw '*P-384*'
+        }
+
+        It 'rejects RS512 sign-attempts that use a HS512 key' {
+            { New-Jwt -Payload @{ sub = 'x' } -Algorithm RS512 -Key $script:secret } |
+                Should -Throw '*RS512*'
+        }
+
+        It 'PS256 signatures are not bit-identical across runs (PSS is randomized)' {
+            $a = (New-Jwt -Payload @{ sub = 'x' } -Algorithm PS256 -Key $script:rsa).Signature
+            $b = (New-Jwt -Payload @{ sub = 'x' } -Algorithm PS256 -Key $script:rsa).Signature
+            $a | Should -Not -Be $b
+        }
+
+        It 'RS256 signatures are deterministic for the same input' {
+            $a = (New-Jwt -Payload @{ sub = 'x' } -Algorithm RS256 -Key $script:rsa).Signature
+            $b = (New-Jwt -Payload @{ sub = 'x' } -Algorithm RS256 -Key $script:rsa).Signature
+            $a | Should -Be $b
+        }
+    }
+
+    Context 'JWK Thumbprint (RFC 7638)' {
+        It 'matches the RFC 7638 §3.1 reference vector' {
+            $json = @'
+{"keys":[{"kty":"RSA","n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw","e":"AQAB","alg":"RS256","kid":"2011-04-29"}]}
+'@
+            $jwk = (ConvertFrom-JwtKeySet -Json $json).keys[0]
+            Get-JwtKeyThumbprint -Key $jwk | Should -Be 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs'
+        }
+
+        It 'computes thumbprints for EC and oct kty' {
+            $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+            $ec = [System.Security.Cryptography.ECDsa]::Create(
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7'))
+            try {
+                $rsaJwk = ConvertTo-JwtKey -Key $rsa
+                $ecJwk = ConvertTo-JwtKey -Key $ec
+                $octJwk = ConvertTo-JwtKey -Key ([byte[]](1..32))
+
+                Get-JwtKeyThumbprint -Key $rsaJwk | Should -Match '^[A-Za-z0-9_-]{43}$'
+                Get-JwtKeyThumbprint -Key $ecJwk | Should -Match '^[A-Za-z0-9_-]{43}$'
+                Get-JwtKeyThumbprint -Key $octJwk | Should -Match '^[A-Za-z0-9_-]{43}$'
+            } finally {
+                $rsa.Dispose()
+                $ec.Dispose()
+            }
+        }
+
+        It 'supports SHA-384 and SHA-512 thumbprint variants' {
+            $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+            try {
+                $jwk = ConvertTo-JwtKey -Key $rsa
+                Get-JwtKeyThumbprint -Key $jwk -HashAlgorithm SHA384 | Should -Match '^[A-Za-z0-9_-]{64}$'
+                Get-JwtKeyThumbprint -Key $jwk -HashAlgorithm SHA512 | Should -Match '^[A-Za-z0-9_-]{86}$'
+            } finally { $rsa.Dispose() }
+        }
+
+        It 'fails when a required field is missing' {
+            $jwk = (ConvertFrom-JwtKeySet -Json '{"keys":[{"kty":"RSA","e":"AQAB"}]}').keys[0]
+            { Get-JwtKeyThumbprint -Key $jwk } | Should -Throw '*missing*'
+        }
+    }
+
+    Context 'JWK Set (RFC 7517 §5)' {
+        BeforeAll {
+            $rsa = [System.Security.Cryptography.RSA]::Create(2048)
+            $ec = [System.Security.Cryptography.ECDsa]::Create(
+                [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7'))
+            $script:rsaForSet = $rsa
+            $script:ecForSet = $ec
+            $script:rsaJwk = ConvertTo-JwtKey -Key $rsa -KeyId 'rsa-1' -Algorithm RS256
+            $script:ecJwk = ConvertTo-JwtKey -Key $ec -KeyId 'ec-1' -Algorithm ES256
+        }
+
+        AfterAll {
+            $script:rsaForSet.Dispose()
+            $script:ecForSet.Dispose()
+        }
+
+        It 'wraps multiple keys via ConvertTo-JwtKeySet' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            $set.GetType().Name | Should -Be 'JwtKeySet'
+            $set.keys.Count | Should -Be 2
+        }
+
+        It 'serializes to a JWKS JSON document with a "keys" array' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            $json = $set.ToJson()
+            $json | Should -Match '"keys":\['
+            $json | Should -Match '"kid":"rsa-1"'
+            $json | Should -Match '"kid":"ec-1"'
+        }
+
+        It 'round-trips through ConvertFrom-JwtKeySet' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            $parsed = ConvertFrom-JwtKeySet -Json $set.ToJson()
+            $parsed.keys.Count | Should -Be 2
+            $parsed.keys[0].kid | Should -Be 'rsa-1'
+            $parsed.keys[1].kid | Should -Be 'ec-1'
+        }
+
+        It 'rejects JWKS JSON missing the keys array' {
+            { ConvertFrom-JwtKeySet -Json '{}' } | Should -Throw "*'keys'*"
+        }
+
+        It 'Get-JwtKeyFromSet returns the matching JwtKey by kid' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            (Get-JwtKeyFromSet -KeySet $set -KeyId 'ec-1').crv | Should -Be 'P-256'
+        }
+
+        It 'Get-JwtKeyFromSet returns $null for an unknown kid' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            Get-JwtKeyFromSet -KeySet $set -KeyId 'nope' | Should -BeNullOrEmpty
+        }
+
+        It '-ErrorIfMissing emits a non-terminating error for an unknown kid' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            $err = $null
+            Get-JwtKeyFromSet -KeySet $set -KeyId 'nope' -ErrorIfMissing -ErrorVariable err -ErrorAction SilentlyContinue
+            $err.Count | Should -BeGreaterThan 0
+        }
+
+        It 'Test-Jwt verifies a token whose kid is resolved from a JWKS' {
+            $set = $script:rsaJwk, $script:ecJwk | ConvertTo-JwtKeySet
+            $jwt = New-Jwt -Payload @{ sub = 'app' } -Algorithm ES256 -Key $script:ecForSet -Header @{ kid = 'ec-1' }
+            $kid = (Get-JwtHeader -Token $jwt).kid
+            $resolved = Get-JwtKeyFromSet -KeySet $set -KeyId $kid
+            Test-Jwt -Token $jwt -Key $resolved -RequireExpiration $false | Should -BeTrue
         }
     }
 
