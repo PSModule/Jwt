@@ -47,23 +47,24 @@
     process {
         $payload = (ConvertFrom-Jwt -Token $Token).Payload
         $registered = [JwtPayload]::RegisteredClaims
+        $missing = [object]::new()
 
         $resolve = {
             param($claimName)
             if ($registered -contains $claimName) {
                 $value = $payload.$claimName
-                if ($null -eq $value) { return [System.Management.Automation.Internal.AutomationNull]::Value }
+                if ($null -eq $value) { return $missing }
                 return $value
             }
             if ($payload.AdditionalFields.Contains($claimName)) {
                 return $payload.AdditionalFields[$claimName]
             }
-            return [System.Management.Automation.Internal.AutomationNull]::Value
+            return $missing
         }
 
         if ($Name.Count -eq 1) {
             $value = & $resolve $Name[0]
-            if ($value -is [System.Management.Automation.Internal.AutomationNull]) {
+            if ([object]::ReferenceEquals($value, $missing)) {
                 if ($ErrorIfMissing) {
                     Write-Error "Claim '$($Name[0])' is not present in the JWT payload."
                 }
@@ -75,7 +76,7 @@
         $result = [ordered]@{}
         foreach ($n in $Name) {
             $value = & $resolve $n
-            if ($value -is [System.Management.Automation.Internal.AutomationNull]) {
+            if ([object]::ReferenceEquals($value, $missing)) {
                 if ($ErrorIfMissing) {
                     Write-Error "Claim '$n' is not present in the JWT payload."
                 }
