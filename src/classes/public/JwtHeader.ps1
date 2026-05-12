@@ -6,7 +6,7 @@
 
     JwtHeader() {}
 
-    JwtHeader([hashtable] $values) {
+    JwtHeader([System.Collections.IDictionary] $values) {
         if ($null -eq $values) { return }
         foreach ($key in $values.Keys) {
             switch ($key) {

@@ -50,16 +50,19 @@
             }
             'EC' {
                 $curve = switch ($Key.crv) {
-                    'P-256' { [System.Security.Cryptography.ECCurve]::NamedCurves.nistP256 }
-                    'P-384' { [System.Security.Cryptography.ECCurve]::NamedCurves.nistP384 }
-                    'P-521' { [System.Security.Cryptography.ECCurve]::NamedCurves.nistP521 }
+                    'P-256' { [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7') }
+                    'P-384' { [System.Security.Cryptography.ECCurve]::CreateFromValue('1.3.132.0.34') }
+                    'P-521' { [System.Security.Cryptography.ECCurve]::CreateFromValue('1.3.132.0.35') }
                     default { throw [System.NotSupportedException]::new("EC curve '$($Key.crv)' is not supported.") }
                 }
-                $params = [System.Security.Cryptography.ECParameters]::new()
-                $params.Curve = $curve
-                $params.Q = [System.Security.Cryptography.ECPoint]::new()
-                $params.Q.X = [JwtBase64Url]::Decode($Key.x)
-                $params.Q.Y = [JwtBase64Url]::Decode($Key.y)
+                $point = [System.Security.Cryptography.ECPoint]@{
+                    X = [JwtBase64Url]::Decode($Key.x)
+                    Y = [JwtBase64Url]::Decode($Key.y)
+                }
+                $params = [System.Security.Cryptography.ECParameters]@{
+                    Curve = $curve
+                    Q     = $point
+                }
                 if ($Key.d) {
                     $params.D = [JwtBase64Url]::Decode($Key.d)
                 }

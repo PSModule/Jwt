@@ -63,12 +63,23 @@
         if ($Key -is [System.Security.Cryptography.ECDsa]) {
             $params = $Key.ExportParameters($IncludePrivateParameters.IsPresent)
             $jwk.kty = 'EC'
-            $jwk.crv = switch ($params.Curve.Oid.FriendlyName) {
-                'nistP256' { 'P-256' }
-                'ECDSA_P256' { 'P-256' }
-                'nistP384' { 'P-384' }
-                'nistP521' { 'P-521' }
-                default { $params.Curve.Oid.FriendlyName }
+            $oidValue = $params.Curve.Oid.Value
+            $oidName = $params.Curve.Oid.FriendlyName
+            $jwk.crv = switch -Regex ($oidValue) {
+                '^1\.2\.840\.10045\.3\.1\.7$' { 'P-256'; break }
+                '^1\.3\.132\.0\.34$' { 'P-384'; break }
+                '^1\.3\.132\.0\.35$' { 'P-521'; break }
+                default {
+                    switch ($oidName) {
+                        'nistP256' { 'P-256' }
+                        'ECDSA_P256' { 'P-256' }
+                        'nistP384' { 'P-384' }
+                        'ECDSA_P384' { 'P-384' }
+                        'nistP521' { 'P-521' }
+                        'ECDSA_P521' { 'P-521' }
+                        default { $oidName }
+                    }
+                }
             }
             $jwk.x = [JwtBase64Url]::Encode($params.Q.X)
             $jwk.y = [JwtBase64Url]::Encode($params.Q.Y)

@@ -40,9 +40,10 @@
     $skewSec = [long]$ClockSkew.TotalSeconds
     $nowSec = [DateTimeOffset]::new($Now.ToUniversalTime()).ToUnixTimeSeconds()
 
-    if ($Payload.exp.HasValue) {
-        if ($nowSec -gt ($Payload.exp.Value + $skewSec)) {
-            $expAt = [DateTimeOffset]::FromUnixTimeSeconds($Payload.exp.Value).UtcDateTime.ToString('o')
+    if ($null -ne $Payload.exp) {
+        $expVal = [long]$Payload.exp
+        if ($nowSec -gt ($expVal + $skewSec)) {
+            $expAt = [DateTimeOffset]::FromUnixTimeSeconds($expVal).UtcDateTime.ToString('o')
             $checks += @{ Name = 'Expiration'; Passed = $false; Reason = "Token expired at $expAt." }
         } else {
             $checks += @{ Name = 'Expiration'; Passed = $true; Reason = $null }
@@ -55,9 +56,10 @@
         }
     }
 
-    if ($Payload.nbf.HasValue) {
-        if ($nowSec -lt ($Payload.nbf.Value - $skewSec)) {
-            $nbfAt = [DateTimeOffset]::FromUnixTimeSeconds($Payload.nbf.Value).UtcDateTime.ToString('o')
+    if ($null -ne $Payload.nbf) {
+        $nbfVal = [long]$Payload.nbf
+        if ($nowSec -lt ($nbfVal - $skewSec)) {
+            $nbfAt = [DateTimeOffset]::FromUnixTimeSeconds($nbfVal).UtcDateTime.ToString('o')
             $checks += @{ Name = 'NotBefore'; Passed = $false; Reason = "Token not valid before $nbfAt." }
         } else {
             $checks += @{ Name = 'NotBefore'; Passed = $true; Reason = $null }
