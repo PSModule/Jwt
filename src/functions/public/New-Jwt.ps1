@@ -4,159 +4,117 @@
         Creates a JSON Web Token.
 
         .DESCRIPTION
-        Creates a JWT from JSON header and payload strings. Supports RS256 with a signing certificate, HS256 with a
-        shared secret, and the none algorithm.
+        Builds a [Jwt] from a header overrides hashtable and a claims payload.
+        The default mode signs the token with the supplied -Key using the requested
+        -Algorithm. The -Unsigned switch produces a token with an empty signature so
+        the signature can be attached by an external signing process (HSM, Azure
+        Key Vault, etc.) by writing to $jwt.Signature.
+
+        Header alg and typ are set automatically. Pass kid or other JOSE fields via
+        -Header. Registered claims (iss, sub, aud, exp, nbf, iat, jti) on -Payload are
+        recognized; other entries flow through as private claims.
+
+        All JSON serialization uses -Depth 100 -Compress to preserve nested claim values.
 
         .EXAMPLE
-        ```powershell
-        $payload = '{"sub":"1234567890","name":"John Doe","admin":true,"iat":1516239022}'
-        $secret = 'a-string-secret-at-least-256-bits-long'
-
-        New-Jwt -Header '{"alg":"HS256","typ":"JWT"}' -PayloadJson $payload -Secret $secret
-        ```
+        $jwt = New-Jwt -Payload @{ sub = 'user@example.com'; exp = 1900000000 } -Key $secret -Algorithm HS256
 
         Creates an HS256-signed JWT.
 
         .EXAMPLE
-        ```powershell
-        $cert = (Get-ChildItem Cert:\CurrentUser\My)[1]
-        $jwt = New-Jwt -Cert $cert -PayloadJson '{"token1":"value1","token2":"value2"}'
-        $jwt.Split('.').Count
-        ```
+        $jwt = New-Jwt -Payload @{ sub = 'app' } -Algorithm RS256 -Unsigned
+        $jwt.SigningInput() | Send-ToKeyVault | ForEach-Object { $jwt.Signature = $_ }
 
-        Creates an RS256-signed JWT with a certificate private key and returns the number of JWT segments.
-
-        .INPUTS
-        System.String
+        Creates an unsigned token, signs the SigningInput externally, and attaches the result.
 
         .OUTPUTS
-        System.String
-
-        .NOTES
-        RS256 requires a certificate with a private key. HS256 requires a string or byte array secret.
-
-        .LINK
-        https://psmodule.io/Jwt/Functions/New-Jwt/
-
-        .LINK
-        https://jwt.io/
+        Jwt
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
         'PSUseShouldProcessForStateChangingFunctions', '',
-        Justification = 'New-Jwt creates an in-memory token and does not change system state.'
+        Justification = 'New-Jwt builds an in-memory token and does not change system state.'
     )]
-    [OutputType([string])]
-    [CmdletBinding()]
+    [OutputType([Jwt])]
+    [CmdletBinding(DefaultParameterSetName = 'Signed')]
     param(
-        # The JWT header JSON.
+        # Optional header overrides. alg and typ are set automatically.
         [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string] $Header = '{"alg":"RS256","typ":"JWT"}',
+        [System.Collections.IDictionary] $Header,
 
-        # The JWT payload JSON.
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
-        [ValidateNotNullOrEmpty()]
-        [string] $PayloadJson,
+        # The JWT claims dictionary. Pass an [ordered]@{} to control on-the-wire JSON key order.
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
+        [System.Collections.IDictionary] $Payload,
 
-        # The signing certificate to use for RS256 tokens.
+        # The signing key. Format depends on -Algorithm.
+        [Parameter(Mandatory, ParameterSetName = 'Signed')]
+        [object] $Key,
+
+        # Produce an unsigned token. The signature must be attached externally via $jwt.Signature.
+        [Parameter(Mandatory, ParameterSetName = 'Unsigned')]
+        [switch] $Unsigned,
+
+        # The signing algorithm.
         [Parameter()]
-        [ValidateNotNull()]
-        [System.Security.Cryptography.X509Certificates.X509Certificate2] $Cert,
-
-        # The string or byte array secret to use for HS256 tokens.
-        [Parameter()]
-        [ValidateNotNull()]
-        [object] $Secret
+        [ValidateSet(
+            'HS256', 'HS384', 'HS512',
+            'RS256', 'RS384', 'RS512',
+            'ES256', 'ES384', 'ES512',
+            'PS256', 'PS384', 'PS512'
+        )]
+        [string] $Algorithm = 'RS256'
     )
 
-    begin {}
-
     process {
-        Write-Verbose "Payload to sign length: $($PayloadJson.Length) characters"
+        $headerValues = [ordered]@{}
+        if ($Header) { foreach ($k in $Header.Keys) { $headerValues[$k] = $Header[$k] } }
+        $headerValues['alg'] = $Algorithm
+        if (-not $headerValues.Contains('typ')) { $headerValues['typ'] = 'JWT' }
 
+        $jwtHeader = [JwtHeader]::new($headerValues)
+        $jwtPayload = [JwtPayload]::new($Payload)
+        $token = [Jwt]::new($jwtHeader, $jwtPayload)
+
+        if ($Unsigned) {
+            $token.Signature = ''
+            return $token
+        }
+
+        $resolved = Resolve-JwtKey -Algorithm $Algorithm -Key $Key
+        $contentBytes = [System.Text.Encoding]::UTF8.GetBytes($token.SigningInput())
+        $hash = Get-JwtAlgorithmHash -Algorithm $Algorithm
         try {
-            $algorithm = (ConvertFrom-Json -InputObject $Header -ErrorAction Stop).alg
-        } catch {
-            $message = "The supplied JWT header is not valid JSON. Header length: $($Header.Length) characters."
-            throw [System.FormatException]::new($message)
-        }
-        if ([string]::IsNullOrEmpty($algorithm)) {
-            throw [System.FormatException]::new('The JWT header is missing the required "alg" claim.')
-        }
-        Write-Verbose "Algorithm: $algorithm"
-
-        try {
-            $null = ConvertFrom-Json -InputObject $PayloadJson -ErrorAction Stop
-        } catch {
-            $message = "The supplied JWT payload is not valid JSON. Payload length: $($PayloadJson.Length) characters."
-            throw [System.FormatException]::new($message)
-        }
-
-        $encodedHeader = ConvertTo-Base64UrlString $Header
-        $encodedPayload = ConvertTo-Base64UrlString $PayloadJson
-        $jwtContent = $encodedHeader + '.' + $encodedPayload
-        $contentBytes = [System.Text.Encoding]::UTF8.GetBytes($jwtContent)
-
-        switch ($algorithm) {
-            'RS256' {
-                if (-not $PSBoundParameters.ContainsKey('Cert')) {
-                    $message = 'RS256 requires a -Cert parameter of type X509Certificate2.'
-                    throw [System.ArgumentException]::new($message, 'Cert')
+            switch -Regex ($Algorithm) {
+                '^RS' {
+                    $rsa = [System.Security.Cryptography.RSA] $resolved
+                    $sigBytes = $rsa.SignData(
+                        $contentBytes,
+                        $hash,
+                        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+                    )
                 }
-                Write-Verbose "Signing certificate: $($Cert.Subject)"
-                $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Cert)
-                if ($null -eq $rsa) {
-                    $message = 'The supplied certificate has no RSA private key and cannot be used to sign.'
-                    throw [System.ArgumentException]::new($message, 'Cert')
-                } else {
-                    try {
-                        $signature = $rsa.SignData(
-                            $contentBytes,
-                            [Security.Cryptography.HashAlgorithmName]::SHA256,
-                            [Security.Cryptography.RSASignaturePadding]::Pkcs1
-                        )
-                        $encodedSignature = ConvertTo-Base64UrlString $signature
-                    } catch {
-                        $message = "Signing with SHA256 and Pkcs1 padding failed using the certificate private key: $_"
-                        throw [System.Exception]::new($message, $_.Exception)
-                    } finally {
-                        $rsa.Dispose()
-                    }
+                '^PS' {
+                    $rsa = [System.Security.Cryptography.RSA] $resolved
+                    $sigBytes = $rsa.SignData(
+                        $contentBytes,
+                        $hash,
+                        [System.Security.Cryptography.RSASignaturePadding]::Pss
+                    )
+                }
+                '^HS' {
+                    $hmac = [System.Security.Cryptography.HMAC] $resolved
+                    $sigBytes = $hmac.ComputeHash($contentBytes)
+                }
+                '^ES' {
+                    $ecdsa = [System.Security.Cryptography.ECDsa] $resolved
+                    $sigBytes = $ecdsa.SignData($contentBytes, $hash)
                 }
             }
-            'HS256' {
-                if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
-                    throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
-                }
-                if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
-                    $message = "Expected Secret parameter as byte array or string, instead got $($Secret.GetType())"
-                    throw [System.ArgumentException]::new($message, 'Secret')
-                }
-                $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
-                try {
-                    $hmacsha256.Key = if ($Secret -is [byte[]]) {
-                        $Secret
-                    } else {
-                        [System.Text.Encoding]::UTF8.GetBytes($Secret)
-                    }
-                    $encodedSignature = ConvertTo-Base64UrlString $hmacsha256.ComputeHash($contentBytes)
-                } catch {
-                    throw [System.Exception]::new("Signing with HMACSHA256 failed: $_", $_.Exception)
-                } finally {
-                    $hmacsha256.Dispose()
-                }
-            }
-            'none' {
-                $encodedSignature = $null
-            }
-            default {
-                $message = 'The algorithm is not one of the supported: "RS256", "HS256", "none".'
-                throw [System.NotSupportedException]::new($message)
+            $token.Signature = [JwtBase64Url]::Encode($sigBytes)
+        } finally {
+            if ($resolved -is [System.IDisposable] -and $resolved -isnot [System.Security.Cryptography.RSA] -and $Key -isnot [System.Security.Cryptography.RSA] -and $Key -isnot [System.Security.Cryptography.ECDsa]) {
+                $resolved.Dispose()
             }
         }
-
-        $jwtContent + '.' + $encodedSignature
+        return $token
     }
-
-    end {}
 }

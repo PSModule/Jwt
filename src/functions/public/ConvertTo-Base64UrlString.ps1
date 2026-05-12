@@ -1,59 +1,36 @@
 ﻿function ConvertTo-Base64UrlString {
     <#
         .SYNOPSIS
-        Encodes text or bytes as a base64url string.
+        Encodes a string or byte array as base64url.
 
         .DESCRIPTION
-        Encodes a string or byte array using base64url encoding suitable for JWT headers, payloads, and signatures.
+        Internal helper that wraps the [JwtBase64Url] class and produces an unpadded
+        base64url string per RFC 4648 §5.
 
         .EXAMPLE
-        ```powershell
-        '{"alg":"RS256","typ":"JWT"}' | ConvertTo-Base64UrlString
-        ```
+        ConvertTo-Base64UrlString 'Hello'
 
-        Encodes the JWT header JSON as `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9`.
-
-        .INPUTS
-        System.String
-        System.Byte[]
-
-        .OUTPUTS
-        System.String
-
-        .NOTES
-        Converts standard base64 output to JWT-safe base64url text by replacing URL-sensitive
-        characters and removing padding.
-
-        .LINK
-        https://psmodule.io/Jwt/Functions/ConvertTo-Base64UrlString/
-
-        .LINK
-        https://jwt.io/
+        Encodes the UTF-8 bytes of the string as base64url.
     #>
     [OutputType([string])]
     [CmdletBinding()]
     param(
-        # The string or byte array to encode.
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
+        # The value to encode. Accepts a [string] (UTF-8 encoded) or a [byte[]].
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [ValidateNotNull()]
-        [Alias('in')]
         [object] $InputObject
     )
 
-    begin {}
-
     process {
-        if ($InputObject -is [string]) {
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($InputObject)
-            [Convert]::ToBase64String($bytes) -replace '\+', '-' -replace '/', '_' -replace '='
-        } elseif ($InputObject -is [byte[]]) {
-            [Convert]::ToBase64String($InputObject) -replace '\+', '-' -replace '/', '_' -replace '='
-        } else {
-            $type = $InputObject.GetType()
-            $message = "ConvertTo-Base64UrlString requires string or byte array input, received $type"
-            throw [System.ArgumentException]::new($message)
+        if ($InputObject -is [byte[]]) {
+            return [JwtBase64Url]::Encode($InputObject)
         }
+        if ($InputObject -is [string]) {
+            return [JwtBase64Url]::EncodeString($InputObject)
+        }
+        throw [System.ArgumentException]::new(
+            "ConvertTo-Base64UrlString requires string or byte array input. Got [$($InputObject.GetType().FullName)].",
+            'InputObject'
+        )
     }
-
-    end {}
 }

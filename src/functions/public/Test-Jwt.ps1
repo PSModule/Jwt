@@ -1,169 +1,143 @@
-function Test-Jwt {
+﻿function Test-Jwt {
     <#
         .SYNOPSIS
-        Tests the cryptographic integrity of a JWT.
+        Verifies the signature and claims of a JWT.
 
         .DESCRIPTION
-        Verifies a JWT signature using the signing certificate for RS256 or a shared secret for HS256. Tokens using the
-        none algorithm are valid only when the signature segment is empty.
+        Performs the full JWT validation pipeline:
+
+        1. Algorithm-key compatibility check (blocks the HS256-with-RSA-public-key
+           algorithm-confusion attack and unknown alg values).
+        2. Signature verification.
+        3. Registered claim validation (exp, nbf, iss, aud), with -ClockSkew tolerance.
+
+        Returns $true / $false by default. With -Detailed, returns a [pscustomobject]
+        whose Checks property is a stable, ordered array indexable by Name.
+
+        Unsigned tokens (alg=none) are rejected unless -AllowUnsigned is supplied.
+        When -AllowUnsigned is used, claim validation still runs and -Detailed
+        reports SignatureValidated=$false with Reason='Skipped (unsigned token)'.
 
         .EXAMPLE
-        ```powershell
-        $jwt | Test-Jwt -Secret 'a-string-secret-at-least-256-bits-long'
-        ```
+        $jwt | Test-Jwt -Key $secret
 
-        Tests an HS256 JWT with a shared secret.
+        Verifies an HS256 token.
 
         .EXAMPLE
-        ```powershell
-        $jwt | Test-Jwt -Cert $cert
-        ```
+        Test-Jwt -Token $jwt -Key $rsa -Issuer 'https://issuer' -Audience 'api' -Detailed
 
-        Tests an RS256 JWT with a public certificate.
-
-        .INPUTS
-        System.String
+        Returns a structured validation report.
 
         .OUTPUTS
         System.Boolean
-
-        .NOTES
-        The Verify-JwtSignature alias is preserved for compatibility with the original module command surface.
-
-        .LINK
-        https://psmodule.io/Jwt/Functions/Test-Jwt/
-
-        .LINK
-        https://jwt.io/
+        System.Management.Automation.PSCustomObject
     #>
-    [OutputType([bool])]
-    [Alias('Verify-JwtSignature')]
+    [OutputType([bool], [pscustomobject])]
     [CmdletBinding()]
     param(
-        # The JWT to test.
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Jwt,
-
-        # The certificate to use for RS256 signature verification.
-        [Parameter()]
+        # The JWT to validate.
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
         [ValidateNotNull()]
-        [System.Security.Cryptography.X509Certificates.X509Certificate2] $Cert,
+        [object] $Token,
 
-        # The string or byte array secret to use for HS256 signature verification.
+        # The verification key. Format depends on the token's alg.
         [Parameter()]
-        [ValidateNotNull()]
-        [object] $Secret
+        [object] $Key,
+
+        # Expected issuer.
+        [Parameter()]
+        [string] $Issuer,
+
+        # Accepted audiences (any-match).
+        [Parameter()]
+        [string[]] $Audience,
+
+        # Allowed clock skew for exp / nbf checks.
+        [Parameter()]
+        [timespan] $ClockSkew = [timespan]::Zero,
+
+        # Require an exp claim. Defaults to $true.
+        [Parameter()]
+        [bool] $RequireExpiration = $true,
+
+        # Allow alg=none unsigned tokens.
+        [Parameter()]
+        [switch] $AllowUnsigned,
+
+        # Return a structured report instead of [bool].
+        [Parameter()]
+        [switch] $Detailed
     )
 
-    begin {}
-
     process {
-        Write-Verbose "Verifying JWT with length $($Jwt.Length) characters"
+        $parsed = ConvertFrom-Jwt -Token $Token
+        $alg = $parsed.Header.alg
 
-        $parts = $Jwt.Split('.')
-        if ($parts.Count -ne 3) {
-            throw [System.ArgumentException]::new('JWT must have exactly 3 segments.')
-        }
-        if (-not $parts[0]) {
-            throw [System.ArgumentException]::new('JWT header segment is missing.')
-        }
-        if (-not $parts[1]) {
-            throw [System.ArgumentException]::new('JWT payload segment is missing.')
-        }
-        $header = ConvertFrom-Base64UrlString $parts[0]
-        try {
-            $algorithm = (ConvertFrom-Json -InputObject $header -ErrorAction Stop).alg
-        } catch {
-            $message = "The supplied JWT header segment is not valid JSON. Header length: $($header.Length) characters."
-            throw [System.FormatException]::new($message)
-        }
-        if ([string]::IsNullOrEmpty($algorithm)) {
-            throw [System.FormatException]::new('The JWT header is missing the required "alg" claim.')
-        }
-        Write-Verbose "Algorithm: $algorithm"
+        $algCheck = @{ Name = 'Algorithm'; Passed = $true; Reason = $null }
+        $sigCheck = @{ Name = 'Signature'; Passed = $false; Reason = $null }
+        $signatureValidated = $false
 
-        switch ($algorithm) {
-            'RS256' {
-                if (-not $PSBoundParameters.ContainsKey('Cert')) {
-                    $message = 'RS256 requires a -Cert parameter of type X509Certificate2.'
-                    throw [System.ArgumentException]::new($message, 'Cert')
-                }
-                if ([string]::IsNullOrEmpty($parts[2])) {
-                    return $false
-                }
-                try {
-                    $bytes = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
-                } catch [System.FormatException] {
-                    return $false
-                }
-                Write-Verbose "Using certificate with subject: $($Cert.Subject)"
-                $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
-                $computed = [System.Security.Cryptography.SHA256]::HashData($signedContent)
-                $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($Cert)
-                if ($null -eq $rsa) {
-                    $message = 'The supplied certificate has no RSA public key and cannot be used to verify.'
-                    throw [System.ArgumentException]::new($message, 'Cert')
-                }
-                try {
-                    $rsa.VerifyHash(
-                        $computed,
-                        $bytes,
-                        [Security.Cryptography.HashAlgorithmName]::SHA256,
-                        [Security.Cryptography.RSASignaturePadding]::Pkcs1
-                    )
-                } finally {
-                    $rsa.Dispose()
+        if ([string]::IsNullOrEmpty($alg)) {
+            $algCheck.Passed = $false
+            $algCheck.Reason = "JWT header is missing the 'alg' claim."
+            throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+        }
+
+        if ($alg -eq 'none') {
+            if (-not $AllowUnsigned) {
+                $algCheck.Passed = $false
+                $algCheck.Reason = "Algorithm 'none' rejected. Pass -AllowUnsigned to permit unsigned tokens."
+                throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+            }
+            if ($PSBoundParameters.ContainsKey('Key')) {
+                $algCheck.Passed = $false
+                $algCheck.Reason = "Algorithm 'none' does not accept a key."
+                throw [System.ArgumentException]::new($algCheck.Reason, 'Key')
+            }
+            $sigCheck.Passed = $true
+            $sigCheck.Reason = 'Skipped (unsigned token)'
+            $signatureValidated = $false
+        } elseif ($alg -in @('HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512')) {
+            $resolved = Resolve-JwtKey -Algorithm $alg -Key $Key
+            try {
+                $sigOk = Test-JwtSignature `
+                    -SigningInput $parsed.SigningInput() `
+                    -Signature $parsed.Signature `
+                    -Algorithm $alg `
+                    -ResolvedKey $resolved
+            } finally {
+                if ($resolved -is [System.IDisposable] -and $Key -isnot [System.Security.Cryptography.RSA] -and $Key -isnot [System.Security.Cryptography.ECDsa]) {
+                    $resolved.Dispose()
                 }
             }
-            'HS256' {
-                if (-not ($PSBoundParameters.ContainsKey('Secret'))) {
-                    throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
-                }
-                if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
-                    $message = "Expected Secret parameter as byte array or string, instead got $($Secret.GetType())"
-                    throw [System.ArgumentException]::new($message, 'Secret')
-                }
-                $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
-                try {
-                    $hmacsha256.Key = if ($Secret -is [byte[]]) {
-                        $Secret
-                    } else {
-                        [System.Text.Encoding]::UTF8.GetBytes($Secret)
-                    }
-                    $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
-                    $signature = $hmacsha256.ComputeHash($signedContent)
-                    if (-not $parts[2]) {
-                        $false
-                    } else {
-                        try {
-                            $providedSignature = ConvertFrom-Base64UrlString $parts[2] -AsByteArray
-                        } catch [System.FormatException] {
-                            $providedSignature = $null
-                        }
-                        if ($null -eq $providedSignature -or $signature.Length -ne $providedSignature.Length) {
-                            $false
-                        } else {
-                            $difference = 0
-                            for ($index = 0; $index -lt $signature.Length; $index++) {
-                                $difference = $difference -bor ($signature[$index] -bxor $providedSignature[$index])
-                            }
-                            $difference -eq 0
-                        }
-                    }
-                } finally {
-                    $hmacsha256.Dispose()
-                }
+            if ($sigOk) {
+                $sigCheck.Passed = $true
+                $signatureValidated = $true
+            } else {
+                $sigCheck.Reason = 'Signature verification failed.'
             }
-            'none' {
-                $parts[2] -eq ''
-            }
-            default {
-                $message = 'The algorithm is not one of the supported: "RS256", "HS256", "none".'
-                throw [System.NotSupportedException]::new($message)
+        } else {
+            $algCheck.Passed = $false
+            $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512, none."
+            throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+        }
+
+        $claimArgs = @{ Payload = $parsed.Payload; ClockSkew = $ClockSkew; RequireExpiration = $RequireExpiration }
+        if ($PSBoundParameters.ContainsKey('Issuer')) { $claimArgs['Issuer'] = $Issuer }
+        if ($PSBoundParameters.ContainsKey('Audience')) { $claimArgs['Audience'] = $Audience }
+        $claimChecks = Test-JwtClaim @claimArgs
+
+        $checks = @($algCheck, $sigCheck) + $claimChecks
+        $valid = -not ($checks | Where-Object { -not $_.Passed })
+
+        if ($Detailed) {
+            return [pscustomobject]@{
+                Valid              = [bool]$valid
+                SignatureValidated = $signatureValidated
+                Algorithm          = $alg
+                Checks             = $checks
             }
         }
+        return [bool]$valid
     }
-
-    end {}
 }

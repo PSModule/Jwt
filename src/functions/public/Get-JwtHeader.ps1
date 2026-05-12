@@ -1,56 +1,31 @@
 ﻿function Get-JwtHeader {
     <#
         .SYNOPSIS
-        Gets the decoded header from a JWT.
+        Returns the parsed header of a JWT.
 
         .DESCRIPTION
-        Decodes and returns the JSON header segment from a JSON Web Token. The payload and signature are ignored.
+        Parses the supplied compact JWT string (or [Jwt] object) and returns the
+        [JwtHeader]. No signature verification is performed.
 
         .EXAMPLE
-        ```powershell
-        $jwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJqb2UiLCJyb2xlIjoiYWRtaW4ifQ.' #gitleaks:allow
-        Get-JwtHeader -Jwt $jwt
-        ```
+        Get-JwtHeader -Token $jwt
 
-        Gets the decoded header JSON from an unsigned JWT.
-
-        .INPUTS
-        System.String
+        Returns the typed header.
 
         .OUTPUTS
-        System.String
-
-        .NOTES
-        This command decodes only the header segment and does not validate the token signature.
-
-        .LINK
-        https://psmodule.io/Jwt/Functions/Get-JwtHeader/
-
-        .LINK
-        https://jwt.io/
+        JwtHeader
     #>
-    [OutputType([string])]
+    [OutputType([JwtHeader])]
     [CmdletBinding()]
     param(
-        # The JWT to read.
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Jwt
+        # The JWT string or [Jwt] object.
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
+        [ValidateNotNull()]
+        [object] $Token
     )
 
-    begin {}
-
     process {
-        Write-Verbose "Processing JWT with length $($Jwt.Length) characters"
-        $parts = $Jwt.Split('.')
-        if ($parts.Count -ne 3) {
-            throw [System.ArgumentException]::new('JWT must have exactly 3 segments.')
-        }
-        if (-not $parts[0]) {
-            throw [System.ArgumentException]::new('JWT header segment is missing.')
-        }
-        ConvertFrom-Base64UrlString $parts[0]
+        $parsed = ConvertFrom-Jwt -Token $Token
+        return $parsed.Header
     }
-
-    end {}
 }

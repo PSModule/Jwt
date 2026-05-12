@@ -4,60 +4,30 @@
         Decodes a base64url string.
 
         .DESCRIPTION
-        Decodes a base64url-encoded string to UTF-8 text by default. Use AsByteArray to return the decoded bytes.
+        Internal helper that wraps the [JwtBase64Url] class. Returns a UTF-8 string by
+        default or the raw byte array when -AsByteArray is supplied.
 
         .EXAMPLE
-        ```powershell
-        'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9' | ConvertFrom-Base64UrlString
-        ```
+        ConvertFrom-Base64UrlString 'SGVsbG8'
 
-        Decodes the base64url value to `{"alg":"RS256","typ":"JWT"}`.
-
-        .INPUTS
-        System.String
-
-        .OUTPUTS
-        System.String
-        System.Byte[]
-
-        .NOTES
-        Converts JWT-safe base64url text by restoring standard base64 characters and padding before decoding.
-
-        .LINK
-        https://psmodule.io/Jwt/Functions/ConvertFrom-Base64UrlString/
-
-        .LINK
-        https://jwt.io/
+        Decodes the base64url string and returns the UTF-8 representation.
     #>
     [OutputType([string], [byte[]])]
     [CmdletBinding()]
     param(
-        # The base64url-encoded string to decode.
-        [Parameter(Mandatory, ValueFromPipeline, Position = 0)]
-        [ValidateNotNullOrEmpty()]
-        [string] $Base64UrlString,
+        # The base64url-encoded value to decode.
+        [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
+        [ValidateNotNull()]
+        [string] $InputObject,
 
-        # Return decoded bytes instead of UTF-8 text.
+        # Return the raw bytes instead of a UTF-8 string.
         [Parameter()]
         [switch] $AsByteArray
     )
 
-    begin {}
-
     process {
-        $base64String = $Base64UrlString.Replace('-', '+').Replace('_', '/')
-        switch ($base64String.Length % 4) {
-            0 { }
-            1 { throw [System.FormatException]::new('Invalid base64url string length.') }
-            2 { $base64String = $base64String + '==' }
-            3 { $base64String = $base64String + '=' }
-        }
-        if ($AsByteArray) {
-            [Convert]::FromBase64String($base64String)
-        } else {
-            [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($base64String))
-        }
+        $bytes = [JwtBase64Url]::Decode($InputObject)
+        if ($AsByteArray) { return , $bytes }
+        return [System.Text.Encoding]::UTF8.GetString($bytes)
     }
-
-    end {}
 }
