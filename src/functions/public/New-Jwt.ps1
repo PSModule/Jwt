@@ -55,7 +55,12 @@
 
         # The signing algorithm.
         [Parameter()]
-        [ValidateSet('RS256', 'HS256', 'ES256')]
+        [ValidateSet(
+            'HS256', 'HS384', 'HS512',
+            'RS256', 'RS384', 'RS512',
+            'ES256', 'ES384', 'ES512',
+            'PS256', 'PS384', 'PS512'
+        )]
         [string] $Algorithm = 'RS256'
     )
 
@@ -76,26 +81,32 @@
 
         $resolved = Resolve-JwtKey -Algorithm $Algorithm -Key $Key
         $contentBytes = [System.Text.Encoding]::UTF8.GetBytes($token.SigningInput())
+        $hash = Get-JwtAlgorithmHash -Algorithm $Algorithm
         try {
-            switch ($Algorithm) {
-                'RS256' {
+            switch -Regex ($Algorithm) {
+                '^RS' {
                     $rsa = [System.Security.Cryptography.RSA] $resolved
                     $sigBytes = $rsa.SignData(
                         $contentBytes,
-                        [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+                        $hash,
                         [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
                     )
                 }
-                'HS256' {
+                '^PS' {
+                    $rsa = [System.Security.Cryptography.RSA] $resolved
+                    $sigBytes = $rsa.SignData(
+                        $contentBytes,
+                        $hash,
+                        [System.Security.Cryptography.RSASignaturePadding]::Pss
+                    )
+                }
+                '^HS' {
                     $hmac = [System.Security.Cryptography.HMAC] $resolved
                     $sigBytes = $hmac.ComputeHash($contentBytes)
                 }
-                'ES256' {
+                '^ES' {
                     $ecdsa = [System.Security.Cryptography.ECDsa] $resolved
-                    $sigBytes = $ecdsa.SignData(
-                        $contentBytes,
-                        [System.Security.Cryptography.HashAlgorithmName]::SHA256
-                    )
+                    $sigBytes = $ecdsa.SignData($contentBytes, $hash)
                 }
             }
             $token.Signature = [JwtBase64Url]::Encode($sigBytes)

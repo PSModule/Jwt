@@ -9,6 +9,9 @@
         an RSA public key supplied for an HS256 token) with a terminating error to
         block algorithm-confusion attacks.
 
+        Supports all JWS algorithms registered in RFC 7518 §3:
+        HS256/HS384/HS512, RS256/RS384/RS512, ES256/ES384/ES512, PS256/PS384/PS512, none.
+
         .EXAMPLE
         Resolve-JwtKey -Algorithm 'RS256' -Key $rsaPem
 
@@ -19,7 +22,13 @@
     param(
         # The algorithm declared by the JWT header.
         [Parameter(Mandatory)]
-        [ValidateSet('RS256', 'HS256', 'ES256', 'none')]
+        [ValidateSet(
+            'HS256', 'HS384', 'HS512',
+            'RS256', 'RS384', 'RS512',
+            'ES256', 'ES384', 'ES512',
+            'PS256', 'PS384', 'PS512',
+            'none'
+        )]
         [string] $Algorithm,
 
         # The key material. Acceptable shapes depend on $Algorithm.
@@ -51,30 +60,58 @@
         $Key = $plain
     }
 
+    $family = switch -Regex ($Algorithm) {
+        '^HS' { 'HS' }
+        '^RS' { 'RSA' }
+        '^PS' { 'RSA' }
+        '^ES' { 'EC' }
+    }
+
+    $expectedCurve = switch ($Algorithm) {
+        'ES256' { 'P-256' }
+        'ES384' { 'P-384' }
+        'ES512' { 'P-521' }
+        default { $null }
+    }
+
+    $expectedCurveOid = switch ($Algorithm) {
+        'ES256' { '1.2.840.10045.3.1.7' }
+        'ES384' { '1.3.132.0.34' }
+        'ES512' { '1.3.132.0.35' }
+        default { $null }
+    }
+
     if ($Key -is [JwtKey]) {
-        switch ($Algorithm) {
-            'RS256' {
+        switch ($family) {
+            'RSA' {
                 if ($Key.kty -ne 'RSA') {
                     throw [System.ArgumentException]::new(
-                        "Algorithm RS256 requires a JwtKey with kty='RSA'. Got kty='$($Key.kty)'.",
+                        "Algorithm $Algorithm requires a JwtKey with kty='RSA'. Got kty='$($Key.kty)'.",
                         'Key'
                     )
                 }
                 return (ConvertFrom-JwtKey -Key $Key)
             }
-            'HS256' {
+            'HS' {
                 if ($Key.kty -ne 'oct') {
                     throw [System.ArgumentException]::new(
-                        "Algorithm HS256 requires a JwtKey with kty='oct'. Got kty='$($Key.kty)'.",
+                        "Algorithm $Algorithm requires a JwtKey with kty='oct'. Got kty='$($Key.kty)'.",
                         'Key'
                     )
                 }
-                return (ConvertFrom-JwtKey -Key $Key)
+                $bytes = [JwtBase64Url]::Decode($Key.k)
+                return (New-JwtHmac -Algorithm $Algorithm -KeyBytes $bytes)
             }
-            'ES256' {
+            'EC' {
                 if ($Key.kty -ne 'EC') {
                     throw [System.ArgumentException]::new(
-                        "Algorithm ES256 requires a JwtKey with kty='EC'. Got kty='$($Key.kty)'.",
+                        "Algorithm $Algorithm requires a JwtKey with kty='EC'. Got kty='$($Key.kty)'.",
+                        'Key'
+                    )
+                }
+                if ($Key.crv -ne $expectedCurve) {
+                    throw [System.ArgumentException]::new(
+                        "Algorithm $Algorithm requires a JwtKey with crv='$expectedCurve'. Got crv='$($Key.crv)'.",
                         'Key'
                     )
                 }
@@ -83,13 +120,13 @@
         }
     }
 
-    switch ($Algorithm) {
-        'RS256' {
+    switch ($family) {
+        'RSA' {
             if ($Key -is [System.Security.Cryptography.RSA]) { return $Key }
             if ($Key -is [string]) {
                 if ($Key -notmatch '-----BEGIN [A-Z ]*KEY-----') {
                     throw [System.ArgumentException]::new(
-                        'Algorithm RS256 requires a PEM-encoded RSA key string. The supplied string is not PEM.',
+                        "Algorithm $Algorithm requires a PEM-encoded RSA key string. The supplied string is not PEM.",
                         'Key'
                     )
                 }
@@ -98,44 +135,63 @@
                 return $rsa
             }
             throw [System.ArgumentException]::new(
-                "Algorithm RS256 does not accept a key of type [$($Key.GetType().FullName)]. " +
+                "Algorithm $Algorithm does not accept a key of type [$($Key.GetType().FullName)]. " +
                 'Use an RSA instance, a PEM string, or a JwtKey with kty=RSA.',
                 'Key'
             )
         }
-        'HS256' {
-            if ($Key -is [byte[]]) { return [System.Security.Cryptography.HMACSHA256]::new($Key) }
+        'HS' {
+            if ($Key -is [byte[]]) { return (New-JwtHmac -Algorithm $Algorithm -KeyBytes $Key) }
             if ($Key -is [string]) {
                 if ($Key -match '-----BEGIN [A-Z ]*KEY-----') {
                     throw [System.ArgumentException]::new(
-                        'Algorithm HS256 rejected a PEM-encoded key. HS256 is symmetric and requires a raw secret. ' +
-                        'This blocks the classic HS256-with-RSA-public-key algorithm-confusion attack.',
+                        "Algorithm $Algorithm rejected a PEM-encoded key. $Algorithm is symmetric and requires a raw secret. " +
+                        'This blocks the classic HS+RSA-public-key algorithm-confusion attack.',
                         'Key'
                     )
                 }
-                return [System.Security.Cryptography.HMACSHA256]::new([System.Text.Encoding]::UTF8.GetBytes($Key))
+                return (New-JwtHmac -Algorithm $Algorithm -KeyBytes ([System.Text.Encoding]::UTF8.GetBytes($Key)))
             }
             throw [System.ArgumentException]::new(
-                "Algorithm HS256 does not accept a key of type [$($Key.GetType().FullName)]. " +
+                "Algorithm $Algorithm does not accept a key of type [$($Key.GetType().FullName)]. " +
                 'Use a byte[], a raw secret string/SecureString, or a JwtKey with kty=oct.',
                 'Key'
             )
         }
-        'ES256' {
-            if ($Key -is [System.Security.Cryptography.ECDsa]) { return $Key }
+        'EC' {
+            if ($Key -is [System.Security.Cryptography.ECDsa]) {
+                $params = $Key.ExportParameters($false)
+                $oid = $params.Curve.Oid.Value
+                if ($oid -and $oid -ne $expectedCurveOid) {
+                    throw [System.ArgumentException]::new(
+                        "Algorithm $Algorithm requires curve $expectedCurve (OID $expectedCurveOid). The supplied ECDsa key uses OID $oid.",
+                        'Key'
+                    )
+                }
+                return $Key
+            }
             if ($Key -is [string]) {
                 if ($Key -notmatch '-----BEGIN [A-Z ]*KEY-----') {
                     throw [System.ArgumentException]::new(
-                        'Algorithm ES256 requires a PEM-encoded EC key string. The supplied string is not PEM.',
+                        "Algorithm $Algorithm requires a PEM-encoded EC key string. The supplied string is not PEM.",
                         'Key'
                     )
                 }
                 $ecdsa = [System.Security.Cryptography.ECDsa]::Create()
                 $ecdsa.ImportFromPem($Key)
+                $params = $ecdsa.ExportParameters($false)
+                $oid = $params.Curve.Oid.Value
+                if ($oid -and $oid -ne $expectedCurveOid) {
+                    $ecdsa.Dispose()
+                    throw [System.ArgumentException]::new(
+                        "Algorithm $Algorithm requires curve $expectedCurve (OID $expectedCurveOid). The supplied EC PEM uses OID $oid.",
+                        'Key'
+                    )
+                }
                 return $ecdsa
             }
             throw [System.ArgumentException]::new(
-                "Algorithm ES256 does not accept a key of type [$($Key.GetType().FullName)]. " +
+                "Algorithm $Algorithm does not accept a key of type [$($Key.GetType().FullName)]. " +
                 'Use an ECDsa instance, a PEM string, or a JwtKey with kty=EC.',
                 'Key'
             )
