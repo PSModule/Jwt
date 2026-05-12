@@ -75,7 +75,8 @@ function Test-Jwt {
         try {
             $algorithm = (ConvertFrom-Json -InputObject $header -ErrorAction Stop).alg
         } catch {
-            throw [System.FormatException]::new("The supplied JWT header segment is not valid JSON. Header length: $($header.Length) characters.")
+            $message = "The supplied JWT header segment is not valid JSON. Header length: $($header.Length) characters."
+            throw [System.FormatException]::new($message)
         }
         if ([string]::IsNullOrEmpty($algorithm)) {
             throw [System.FormatException]::new('The JWT header is missing the required "alg" claim.')
@@ -85,7 +86,8 @@ function Test-Jwt {
         switch ($algorithm) {
             'RS256' {
                 if (-not $PSBoundParameters.ContainsKey('Cert')) {
-                    throw [System.ArgumentException]::new('RS256 requires a -Cert parameter of type X509Certificate2.', 'Cert')
+                    $message = 'RS256 requires a -Cert parameter of type X509Certificate2.'
+                    throw [System.ArgumentException]::new($message, 'Cert')
                 }
                 if ([string]::IsNullOrEmpty($parts[2])) {
                     return $false
@@ -100,7 +102,8 @@ function Test-Jwt {
                 $computed = [System.Security.Cryptography.SHA256]::HashData($signedContent)
                 $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($Cert)
                 if ($null -eq $rsa) {
-                    throw [System.ArgumentException]::new('The supplied certificate has no RSA public key and cannot be used to verify.', 'Cert')
+                    $message = 'The supplied certificate has no RSA public key and cannot be used to verify.'
+                    throw [System.ArgumentException]::new($message, 'Cert')
                 }
                 try {
                     $rsa.VerifyHash(
@@ -118,11 +121,16 @@ function Test-Jwt {
                     throw [System.ArgumentException]::new('HS256 requires a -Secret parameter.', 'Secret')
                 }
                 if ($Secret -isnot [byte[]] -and $Secret -isnot [string]) {
-                    throw [System.ArgumentException]::new("Expected Secret parameter as byte array or string, instead got $($Secret.GetType())", 'Secret')
+                    $message = "Expected Secret parameter as byte array or string, instead got $($Secret.GetType())"
+                    throw [System.ArgumentException]::new($message, 'Secret')
                 }
                 $hmacsha256 = [System.Security.Cryptography.HMACSHA256]::new()
                 try {
-                    $hmacsha256.Key = if ($Secret -is [byte[]]) { $Secret } else { [System.Text.Encoding]::UTF8.GetBytes($Secret) }
+                    $hmacsha256.Key = if ($Secret -is [byte[]]) {
+                        $Secret
+                    } else {
+                        [System.Text.Encoding]::UTF8.GetBytes($Secret)
+                    }
                     $signedContent = [System.Text.Encoding]::UTF8.GetBytes($parts[0] + '.' + $parts[1])
                     $signature = $hmacsha256.ComputeHash($signedContent)
                     if (-not $parts[2]) {
@@ -151,7 +159,8 @@ function Test-Jwt {
                 $parts[2] -eq ''
             }
             default {
-                throw [System.NotSupportedException]::new('The algorithm is not one of the supported: "RS256", "HS256", "none".')
+                $message = 'The algorithm is not one of the supported: "RS256", "HS256", "none".'
+                throw [System.NotSupportedException]::new($message)
             }
         }
     }
