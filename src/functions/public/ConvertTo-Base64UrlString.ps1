@@ -51,7 +51,7 @@
         } else {
             $type = $InputObject.GetType()
             $message = "ConvertTo-Base64UrlString requires string or byte array input, received $type"
-            throw [System.ArgumentException]::new($message, 'InputObject')
+            throw [System.ArgumentException]::new($message)
         }
     }
 
