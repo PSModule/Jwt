@@ -52,13 +52,10 @@
             param($claimName)
             if ($registered -contains $claimName) {
                 $value = $payload.$claimName
-                if ($value -is [System.Nullable[long]]) {
-                    if ($value.HasValue) { return $value.Value }
-                    return $null
-                }
+                if ($null -eq $value) { return [System.Management.Automation.Internal.AutomationNull]::Value }
                 return $value
             }
-            if ($payload.AdditionalFields.ContainsKey($claimName)) {
+            if ($payload.AdditionalFields.Contains($claimName)) {
                 return $payload.AdditionalFields[$claimName]
             }
             return [System.Management.Automation.Internal.AutomationNull]::Value

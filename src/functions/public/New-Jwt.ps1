@@ -39,11 +39,11 @@
     param(
         # Optional header overrides. alg and typ are set automatically.
         [Parameter()]
-        [hashtable] $Header,
+        [System.Collections.IDictionary] $Header,
 
-        # The JWT claims hashtable. Registered claims are recognized; the rest flow as private claims.
+        # The JWT claims dictionary. Pass an [ordered]@{} to control on-the-wire JSON key order.
         [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
-        [hashtable] $Payload,
+        [System.Collections.IDictionary] $Payload,
 
         # The signing key. Format depends on -Algorithm.
         [Parameter(Mandatory, ParameterSetName = 'Signed')]
@@ -60,10 +60,10 @@
     )
 
     process {
-        $headerValues = @{}
+        $headerValues = [ordered]@{}
         if ($Header) { foreach ($k in $Header.Keys) { $headerValues[$k] = $Header[$k] } }
         $headerValues['alg'] = $Algorithm
-        if (-not $headerValues.ContainsKey('typ')) { $headerValues['typ'] = 'JWT' }
+        if (-not $headerValues.Contains('typ')) { $headerValues['typ'] = 'JWT' }
 
         $jwtHeader = [JwtHeader]::new($headerValues)
         $jwtPayload = [JwtPayload]::new($Payload)
