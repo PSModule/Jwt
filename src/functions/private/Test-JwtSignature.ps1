@@ -5,7 +5,8 @@
 
         .DESCRIPTION
         Internal verification primitive used by Test-Jwt. Assumes the algorithm-key
-        compatibility check has already been done by Resolve-JwtKey.
+        compatibility check has already been done by Resolve-JwtKey. Supports all
+        JWS algorithms in RFC 7518 §3.
 
         .EXAMPLE
         Test-JwtSignature -SigningInput $jwt.SigningInput() -Signature $jwt.Signature -Algorithm 'HS256' -ResolvedKey $hmac
@@ -26,7 +27,12 @@
 
         # The JWS algorithm.
         [Parameter(Mandatory)]
-        [ValidateSet('RS256', 'HS256', 'ES256')]
+        [ValidateSet(
+            'HS256', 'HS384', 'HS512',
+            'RS256', 'RS384', 'RS512',
+            'ES256', 'ES384', 'ES512',
+            'PS256', 'PS384', 'PS512'
+        )]
         [string] $Algorithm,
 
         # A typed key returned by Resolve-JwtKey.
@@ -43,18 +49,28 @@
     }
 
     $contentBytes = [System.Text.Encoding]::UTF8.GetBytes($SigningInput)
+    $hash = Get-JwtAlgorithmHash -Algorithm $Algorithm
 
-    switch ($Algorithm) {
-        'RS256' {
+    switch -Regex ($Algorithm) {
+        '^RS' {
             $rsa = [System.Security.Cryptography.RSA] $ResolvedKey
             return $rsa.VerifyData(
                 $contentBytes,
                 $sigBytes,
-                [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+                $hash,
                 [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
             )
         }
-        'HS256' {
+        '^PS' {
+            $rsa = [System.Security.Cryptography.RSA] $ResolvedKey
+            return $rsa.VerifyData(
+                $contentBytes,
+                $sigBytes,
+                $hash,
+                [System.Security.Cryptography.RSASignaturePadding]::Pss
+            )
+        }
+        '^HS' {
             $hmac = [System.Security.Cryptography.HMAC] $ResolvedKey
             $computed = $hmac.ComputeHash($contentBytes)
             if ($computed.Length -ne $sigBytes.Length) { return $false }
@@ -64,13 +80,9 @@
             }
             return $diff -eq 0
         }
-        'ES256' {
+        '^ES' {
             $ecdsa = [System.Security.Cryptography.ECDsa] $ResolvedKey
-            return $ecdsa.VerifyData(
-                $contentBytes,
-                $sigBytes,
-                [System.Security.Cryptography.HashAlgorithmName]::SHA256
-            )
+            return $ecdsa.VerifyData($contentBytes, $sigBytes, $hash)
         }
     }
     return $false

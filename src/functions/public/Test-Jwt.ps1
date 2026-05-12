@@ -97,7 +97,7 @@
             $sigCheck.Passed = $true
             $sigCheck.Reason = 'Skipped (unsigned token)'
             $signatureValidated = $false
-        } elseif ($alg -in @('RS256', 'HS256', 'ES256')) {
+        } elseif ($alg -in @('HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512')) {
             $resolved = Resolve-JwtKey -Algorithm $alg -Key $Key
             try {
                 $sigOk = Test-JwtSignature `
@@ -118,7 +118,7 @@
             }
         } else {
             $algCheck.Passed = $false
-            $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: RS256, HS256, ES256, none."
+            $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512, none."
             throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
         }
 
