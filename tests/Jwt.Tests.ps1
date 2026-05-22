@@ -2,6 +2,14 @@
     'PSUseDeclaredVarsMoreThanAssignments', '',
     Justification = 'Required for Pester tests'
 )]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSAvoidUsingConvertToSecureStringWithPlainText', '',
+    Justification = 'Test uses plaintext secrets intentionally for deterministic testing.'
+)]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+    'PSAvoidLongLines', '',
+    Justification = 'Test data (RFC reference vectors) cannot be broken across lines.'
+)]
 [CmdletBinding()]
 param()
 
@@ -585,6 +593,25 @@ Describe 'Jwt module' {
             $kid = (Get-JwtHeader -Token $jwt).kid
             $resolved = Get-JwtKeyFromSet -KeySet $set -KeyId $kid
             Test-Jwt -Token $jwt -Key $resolved -RequireExpiration $false | Should -BeTrue
+        }
+    }
+
+    Context 'Base64Url helpers' {
+        It 'ConvertFrom-Base64UrlString decodes a UTF-8 string' {
+            ConvertFrom-Base64UrlString 'SGVsbG8' | Should -Be 'Hello'
+        }
+
+        It 'ConvertFrom-Base64UrlString -AsByteArray returns bytes' {
+            $bytes = ConvertFrom-Base64UrlString 'SGVsbG8' -AsByteArray
+            $bytes | Should -BeOfType [byte]
+            [System.Text.Encoding]::UTF8.GetString($bytes) | Should -Be 'Hello'
+        }
+
+        It 'ConvertTo-Base64UrlString round-trips with ConvertFrom-Base64UrlString' {
+            $original = 'JWT test payload with special chars: +/='
+            $encoded = ConvertTo-Base64UrlString $original
+            $decoded = ConvertFrom-Base64UrlString $encoded
+            $decoded | Should -Be $original
         }
     }
 

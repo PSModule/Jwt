@@ -27,6 +27,10 @@
         .OUTPUTS
         Object
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseOutputTypeCorrectly', '',
+        Justification = 'Returns OrderedDictionary for multi-name queries; single-name returns object.'
+    )]
     [OutputType([object])]
     [CmdletBinding()]
     param(

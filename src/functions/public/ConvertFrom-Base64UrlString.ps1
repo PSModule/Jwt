@@ -12,6 +12,10 @@
 
         Decodes the base64url string and returns the UTF-8 representation.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseOutputTypeCorrectly', '',
+        Justification = 'Returns byte[] via unary comma to prevent pipeline unrolling; declared types are correct.'
+    )]
     [OutputType([string], [byte[]])]
     [CmdletBinding()]
     param(

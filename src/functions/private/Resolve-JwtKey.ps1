@@ -17,6 +17,10 @@
 
         Returns an [RSA] populated from the PEM-encoded key.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseOutputTypeCorrectly', '',
+        Justification = 'Returns RSA/ECDsa/HMAC depending on algorithm family; all derive from object.'
+    )]
     [OutputType([object])]
     [CmdletBinding()]
     param(
