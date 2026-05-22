@@ -20,7 +20,7 @@ Requires PowerShell 7.6 or newer. Windows PowerShell 5.1 is not supported.
 | HMAC    | `HS256`, `HS384`, `HS512`                               | `byte[]`, raw secret string, `SecureString`, `JwtKey` (kty=oct)             |
 | RSA     | `RS256`, `RS384`, `RS512`                               | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)                                   |
 | RSA-PSS | `PS256`, `PS384`, `PS512`                               | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)                                   |
-| ECDSA   | `ES256` (P-256), `ES384` (P-384), `ES512` (P-521)      | `ECDsa`, EC PEM string, `JwtKey` (kty=EC)                                   |
+| ECDSA   | `ES256` (P-256), `ES384` (P-384), `ES512` (P-521)      | `ECDsa`, EC PEM string, `JwtKey` (kty=EC)                                    |
 | None    | `none`                                                  | No key. Rejected by `Test-Jwt` unless `-AllowUnsigned` is supplied.         |
 
 The curve attached to an ECDSA key is checked against the algorithm's required curve before any signature work, and HMAC keys are rejected when supplied for an asymmetric algorithm — both block the classic [algorithm-confusion attack](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/).
@@ -29,17 +29,17 @@ The curve attached to an ECDSA key is checked against the algorithm's required c
 
 | Function                                                    | Purpose                                                                           |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `New-Jwt`                                                   | Create a JWT from header overrides and a claims hashtable; sign locally or `-Unsigned` |
+| `New-Jwt`                                                   | Create a JWT from header overrides and claims; sign locally or `-Unsigned`        |
 | `ConvertFrom-Jwt`                                           | Parse a compact JWT string into a typed `[Jwt]` (no validation)                   |
 | `Test-Jwt`                                                  | Verify the signature and registered claims (`exp`, `nbf`, `iss`, `aud`)           |
 | `Get-JwtHeader`                                             | Return the parsed `[JwtHeader]` of a token                                        |
 | `Get-JwtPayload`                                            | Return the parsed `[JwtPayload]` of a token                                       |
 | `Get-JwtClaim`                                              | Return one or more named claims (registered or private)                           |
-| `ConvertTo-JwtKey`                                          | Convert an `RSA` / `ECDsa` / `byte[]` into a `[JwtKey]` (JWK)                    |
-| `ConvertFrom-JwtKey`                                        | Convert a `[JwtKey]` (JWK) back into a .NET key                                  |
+| `ConvertTo-JwtKey`                                          | Convert an `RSA` / `ECDsa` / `byte[]` into a `[JwtKey]` (JWK)                     |
+| `ConvertFrom-JwtKey`                                        | Convert a `[JwtKey]` (JWK) back into a .NET key                                   |
 | `ConvertTo-JwtKeySet`                                       | Wrap one or more `[JwtKey]` in a `[JwtKeySet]` (JWKS)                             |
 | `ConvertFrom-JwtKeySet`                                     | Parse a JWKS JSON document into a `[JwtKeySet]`                                   |
-| `Get-JwtKeyFromSet`                                         | Look up a `[JwtKey]` in a `[JwtKeySet]` by `kid`                                 |
+| `Get-JwtKeyFromSet`                                         | Look up a `[JwtKey]` in a `[JwtKeySet]` by `kid`                                  |
 | `Get-JwtKeyThumbprint`                                      | Compute the RFC 7638 JWK thumbprint of a key (`SHA-256` / `SHA-384` / `SHA-512`)  |
 | `ConvertTo-Base64UrlString` / `ConvertFrom-Base64UrlString` | Base64url codec helpers (RFC 4648 §5)                                             |
 
