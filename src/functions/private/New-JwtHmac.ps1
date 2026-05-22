@@ -7,6 +7,14 @@
         Internal factory that maps HS256/HS384/HS512 to HMACSHA256/384/512. Centralized
         so Resolve-JwtKey, Test-JwtSignature, and New-Jwt all agree on the hash size.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'New-JwtHmac creates an in-memory HMAC instance and does not change system state.'
+    )]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseOutputTypeCorrectly', '',
+        Justification = 'Returns HMACSHA256/384/512 which derive from HMAC.'
+    )]
     [OutputType([System.Security.Cryptography.HMAC])]
     [CmdletBinding()]
     param(

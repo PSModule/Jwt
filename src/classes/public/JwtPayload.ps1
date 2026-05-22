@@ -31,20 +31,21 @@
     }
 
     hidden [object] _GetValueFor([string] $key) {
+        $autoNull = [System.Management.Automation.Internal.AutomationNull]::Value
         switch ($key) {
-            'iss' { if ($this.iss) { return $this.iss } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
-            'sub' { if ($this.sub) { return $this.sub } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
-            'aud' { if ($null -ne $this.aud) { return $this.aud } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
-            'exp' { if ($null -ne $this.exp) { return [long]$this.exp } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
-            'nbf' { if ($null -ne $this.nbf) { return [long]$this.nbf } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
-            'iat' { if ($null -ne $this.iat) { return [long]$this.iat } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
-            'jti' { if ($this.jti) { return $this.jti } else { return [System.Management.Automation.Internal.AutomationNull]::Value } }
+            'iss' { if ($this.iss) { return $this.iss } else { return $autoNull } }
+            'sub' { if ($this.sub) { return $this.sub } else { return $autoNull } }
+            'aud' { if ($null -ne $this.aud) { return $this.aud } else { return $autoNull } }
+            'exp' { if ($null -ne $this.exp) { return [long]$this.exp } else { return $autoNull } }
+            'nbf' { if ($null -ne $this.nbf) { return [long]$this.nbf } else { return $autoNull } }
+            'iat' { if ($null -ne $this.iat) { return [long]$this.iat } else { return $autoNull } }
+            'jti' { if ($this.jti) { return $this.jti } else { return $autoNull } }
             default {
                 if ($this.AdditionalFields.Contains($key)) { return $this.AdditionalFields[$key] }
-                return [System.Management.Automation.Internal.AutomationNull]::Value
+                return $autoNull
             }
         }
-        return [System.Management.Automation.Internal.AutomationNull]::Value
+        return $autoNull
     }
 
     [System.Collections.Specialized.OrderedDictionary] ToOrderedDictionary() {

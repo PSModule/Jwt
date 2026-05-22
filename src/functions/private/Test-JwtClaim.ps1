@@ -8,6 +8,10 @@
         with Name, Passed, and Reason fields. Audience matching is array-aware per
         RFC 7519 §4.1.3.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseOutputTypeCorrectly', '',
+        Justification = 'Returns hashtable[] via unary comma to prevent pipeline unrolling.'
+    )]
     [OutputType([hashtable[]])]
     [CmdletBinding()]
     param(

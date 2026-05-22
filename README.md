@@ -15,33 +15,33 @@ Requires PowerShell 7.6 or newer. Windows PowerShell 5.1 is not supported.
 
 ## Algorithms
 
-| Family | Algorithms                          | Key shapes                                      |
-| ------ | ----------------------------------- | ----------------------------------------------- |
-| HMAC   | `HS256`, `HS384`, `HS512`           | `byte[]`, raw secret string, `SecureString`, `JwtKey` (kty=oct) |
-| RSA    | `RS256`, `RS384`, `RS512`           | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)       |
-| RSA-PSS | `PS256`, `PS384`, `PS512`          | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)       |
-| ECDSA  | `ES256` (P-256), `ES384` (P-384), `ES512` (P-521) | `ECDsa`, EC PEM string, `JwtKey` (kty=EC) |
-| None   | `none`                              | No key. Rejected by `Test-Jwt` unless `-AllowUnsigned` is supplied. |
+| Family  | Algorithms                                              | Key shapes                                                                  |
+| ------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| HMAC    | `HS256`, `HS384`, `HS512`                               | `byte[]`, raw secret string, `SecureString`, `JwtKey` (kty=oct)             |
+| RSA     | `RS256`, `RS384`, `RS512`                               | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)                                   |
+| RSA-PSS | `PS256`, `PS384`, `PS512`                               | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)                                   |
+| ECDSA   | `ES256` (P-256), `ES384` (P-384), `ES512` (P-521)      | `ECDsa`, EC PEM string, `JwtKey` (kty=EC)                                   |
+| None    | `none`                                                  | No key. Rejected by `Test-Jwt` unless `-AllowUnsigned` is supplied.         |
 
 The curve attached to an ECDSA key is checked against the algorithm's required curve before any signature work, and HMAC keys are rejected when supplied for an asymmetric algorithm — both block the classic [algorithm-confusion attack](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/).
 
 ## Public surface
 
-| Function                | Purpose                                                                            |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| `New-Jwt`               | Create a JWT from header overrides and a claims hashtable; sign locally or `-Unsigned` |
-| `ConvertFrom-Jwt`       | Parse a compact JWT string into a typed `[Jwt]` (no validation)                    |
-| `Test-Jwt`              | Verify the signature and registered claims (`exp`, `nbf`, `iss`, `aud`)            |
-| `Get-JwtHeader`         | Return the parsed `[JwtHeader]` of a token                                         |
-| `Get-JwtPayload`        | Return the parsed `[JwtPayload]` of a token                                        |
-| `Get-JwtClaim`          | Return one or more named claims (registered or private)                            |
-| `ConvertTo-JwtKey`      | Convert an `RSA` / `ECDsa` / `byte[]` into a `[JwtKey]` (JWK)                      |
-| `ConvertFrom-JwtKey`    | Convert a `[JwtKey]` (JWK) back into a .NET key                                    |
-| `ConvertTo-JwtKeySet`   | Wrap one or more `[JwtKey]` in a `[JwtKeySet]` (JWKS)                              |
-| `ConvertFrom-JwtKeySet` | Parse a JWKS JSON document into a `[JwtKeySet]`                                    |
-| `Get-JwtKeyFromSet`     | Look up a `[JwtKey]` in a `[JwtKeySet]` by `kid`                                   |
-| `Get-JwtKeyThumbprint`  | Compute the RFC 7638 JWK thumbprint of a key (`SHA-256` / `SHA-384` / `SHA-512`)   |
-| `ConvertTo-Base64UrlString` / `ConvertFrom-Base64UrlString` | Base64url codec helpers (RFC 4648 §5)          |
+| Function                                                    | Purpose                                                                           |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `New-Jwt`                                                   | Create a JWT from header overrides and a claims hashtable; sign locally or `-Unsigned` |
+| `ConvertFrom-Jwt`                                           | Parse a compact JWT string into a typed `[Jwt]` (no validation)                   |
+| `Test-Jwt`                                                  | Verify the signature and registered claims (`exp`, `nbf`, `iss`, `aud`)           |
+| `Get-JwtHeader`                                             | Return the parsed `[JwtHeader]` of a token                                        |
+| `Get-JwtPayload`                                            | Return the parsed `[JwtPayload]` of a token                                       |
+| `Get-JwtClaim`                                              | Return one or more named claims (registered or private)                           |
+| `ConvertTo-JwtKey`                                          | Convert an `RSA` / `ECDsa` / `byte[]` into a `[JwtKey]` (JWK)                    |
+| `ConvertFrom-JwtKey`                                        | Convert a `[JwtKey]` (JWK) back into a .NET key                                  |
+| `ConvertTo-JwtKeySet`                                       | Wrap one or more `[JwtKey]` in a `[JwtKeySet]` (JWKS)                             |
+| `ConvertFrom-JwtKeySet`                                     | Parse a JWKS JSON document into a `[JwtKeySet]`                                   |
+| `Get-JwtKeyFromSet`                                         | Look up a `[JwtKey]` in a `[JwtKeySet]` by `kid`                                 |
+| `Get-JwtKeyThumbprint`                                      | Compute the RFC 7638 JWK thumbprint of a key (`SHA-256` / `SHA-384` / `SHA-512`)  |
+| `ConvertTo-Base64UrlString` / `ConvertFrom-Base64UrlString` | Base64url codec helpers (RFC 4648 §5)                                             |
 
 Public types: `[Jwt]`, `[JwtHeader]`, `[JwtPayload]`, `[JwtKey]`, `[JwtKeySet]`, `[JwtBase64Url]`.
 
@@ -160,7 +160,7 @@ Supported `kty`: `RSA`, `EC` (P-256 / P-384 / P-521), `oct` (HMAC).
 
 ## Roadmap
 
-The v2 release covers the JWS half of JOSE end to end (RFC 7515 / 7517 / 7518 §3 / 7519 / 7638). The following are tracked as follow-ups:
+The v2 release covers the JWS half of JOSE end-to-end (RFC 7515 / 7517 / 7518 §3 / 7519 / 7638). The following are tracked as follow-ups:
 
 - **JWE — RFC 7516 + RFC 7518 §4–§5.** `Protect-Jwt` / `Unprotect-Jwt` plus the full key-management and content-encryption matrix (`RSA-OAEP-256`, `A128/192/256KW`, `A128/192/256GCMKW`, `dir`, `ECDH-ES` family, `PBES2-*`, content algorithms `A128/192/256GCM`, `A128CBC-HS256` family). Not in scope for v2 because the surface is large and the AES-CBC-HMAC mode in particular requires careful constant-time MAC-then-decrypt to avoid padding-oracle bugs.
 - **EdDSA — RFC 8037.** `Ed25519` and `Ed448` over the `OKP` key type. Blocked on first-party Ed25519 support landing in `System.Security.Cryptography`; the project's "no third-party dependencies" rule rules out a BouncyCastle workaround.

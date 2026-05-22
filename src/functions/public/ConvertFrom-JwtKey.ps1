@@ -21,6 +21,10 @@
         System.Security.Cryptography.ECDsa
         System.Security.Cryptography.HMAC
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseOutputTypeCorrectly', '',
+        Justification = 'Returns RSA/ECDsa/HMACSHA256 which derive from the declared base types.'
+    )]
     [OutputType([System.Security.Cryptography.AsymmetricAlgorithm], [System.Security.Cryptography.HMAC])]
     [CmdletBinding()]
     param(

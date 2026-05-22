@@ -83,6 +83,13 @@
             throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
         }
 
+        $supportedAlgs = @(
+            'HS256', 'HS384', 'HS512',
+            'RS256', 'RS384', 'RS512',
+            'ES256', 'ES384', 'ES512',
+            'PS256', 'PS384', 'PS512'
+        )
+
         if ($alg -eq 'none') {
             if (-not $AllowUnsigned) {
                 $algCheck.Passed = $false
@@ -97,7 +104,7 @@
             $sigCheck.Passed = $true
             $sigCheck.Reason = 'Skipped (unsigned token)'
             $signatureValidated = $false
-        } elseif ($alg -in @('HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512')) {
+        } elseif ($alg -in $supportedAlgs) {
             $resolved = Resolve-JwtKey -Algorithm $alg -Key $Key
             try {
                 $sigOk = Test-JwtSignature `
@@ -106,7 +113,12 @@
                     -Algorithm $alg `
                     -ResolvedKey $resolved
             } finally {
-                if ($resolved -is [System.IDisposable] -and $Key -isnot [System.Security.Cryptography.RSA] -and $Key -isnot [System.Security.Cryptography.ECDsa]) {
+                $shouldDispose = (
+                    $resolved -is [System.IDisposable] -and
+                    $Key -isnot [System.Security.Cryptography.RSA] -and
+                    $Key -isnot [System.Security.Cryptography.ECDsa]
+                )
+                if ($shouldDispose) {
                     $resolved.Dispose()
                 }
             }
@@ -118,8 +130,10 @@
             }
         } else {
             $algCheck.Passed = $false
-            $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512, none."
-            throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+            $allowed = ($supportedAlgs + 'none') -join ', '
+            $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: $allowed."
+            throw [System.Security.Authentication.AuthenticationException]::new(
+                $algCheck.Reason)
         }
 
         $claimArgs = @{ Payload = $parsed.Payload; ClockSkew = $ClockSkew; RequireExpiration = $RequireExpiration }

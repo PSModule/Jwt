@@ -111,7 +111,13 @@
             }
             $token.Signature = [JwtBase64Url]::Encode($sigBytes)
         } finally {
-            if ($resolved -is [System.IDisposable] -and $resolved -isnot [System.Security.Cryptography.RSA] -and $Key -isnot [System.Security.Cryptography.RSA] -and $Key -isnot [System.Security.Cryptography.ECDsa]) {
+            $shouldDispose = (
+                $resolved -is [System.IDisposable] -and
+                $resolved -isnot [System.Security.Cryptography.RSA] -and
+                $Key -isnot [System.Security.Cryptography.RSA] -and
+                $Key -isnot [System.Security.Cryptography.ECDsa]
+            )
+            if ($shouldDispose) {
                 $resolved.Dispose()
             }
         }
