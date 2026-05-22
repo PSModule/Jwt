@@ -51,6 +51,7 @@
     }
     ExcludeRules = @(
         'PSMissingModuleManifestField', # This rule is not applicable until the module is built.
-        'PSUseToExportFieldsInManifest'
+        'PSUseToExportFieldsInManifest',
+        'TypeNotFound' # False positive: class cross-references are resolved at runtime, not parse time.
     )
 }
