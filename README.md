@@ -3,6 +3,10 @@
 Jwt is a PowerShell module for creating, decoding, and verifying JSON Web Tokens (JWTs). It supports HS256
 shared-secret tokens, RS256 certificate-signed tokens, and the `none` algorithm.
 
+> [!WARNING]
+> The `none` algorithm produces an unsigned token whose integrity cannot be verified. Avoid it for
+> authentication or authorization; use HS256 or RS256 for any token that must be trusted.
+
 ## Installation
 
 Install the module from the PowerShell Gallery:
