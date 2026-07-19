@@ -15,13 +15,11 @@ Requires PowerShell 7.6 or newer. Windows PowerShell 5.1 is not supported.
 
 ## Algorithms
 
-| Family  | Algorithms                                         | Key shapes                                                                 |
-| ------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
-| HMAC    | `HS256`, `HS384`, `HS512`                          | `byte[]`, raw secret string, `SecureString`, `JwtKey` (kty=oct)           |
-| RSA     | `RS256`, `RS384`, `RS512`                          | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)                                 |
-| RSA-PSS | `PS256`, `PS384`, `PS512`                          | `RSA`, RSA PEM string, `JwtKey` (kty=RSA)                                 |
-| ECDSA   | `ES256` (P-256), `ES384` (P-384), `ES512` (P-521) | `ECDsa`, EC PEM string, `JwtKey` (kty=EC)                                 |
-| None    | `none`                                             | No key. Rejected by `Test-Jwt` unless `-AllowUnsigned` is supplied.       |
+- HMAC (`HS256`, `HS384`, `HS512`): `byte[]`, raw secret string, `SecureString`, `JwtKey` (kty=oct)
+- RSA (`RS256`, `RS384`, `RS512`): `RSA`, RSA PEM string, `JwtKey` (kty=RSA)
+- RSA-PSS (`PS256`, `PS384`, `PS512`): `RSA`, RSA PEM string, `JwtKey` (kty=RSA)
+- ECDSA (`ES256`/P-256, `ES384`/P-384, `ES512`/P-521): `ECDsa`, EC PEM string, `JwtKey` (kty=EC)
+- None (`none`): no key; rejected by `Test-Jwt` unless `-AllowUnsigned` is supplied.
 
 The curve attached to an ECDSA key is checked against the algorithm's required curve before any signature work, and HMAC keys are rejected when supplied for an asymmetric algorithm — both block the classic [algorithm-confusion attack](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/).
 
