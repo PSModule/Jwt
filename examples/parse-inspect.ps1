@@ -1,5 +1,5 @@
 $token = New-Jwt -Payload @{
-    sub = 'joe'
+    sub  = 'joe'
     role = 'admin'
 } -Algorithm HS256 -Key 'a-string-secret-at-least-256-bits-long'
 
