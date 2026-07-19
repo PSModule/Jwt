@@ -1,13 +1,13 @@
-function Get-KeyVaultOidcMissingConfig {
+function Get-KeyVaultClientSecretMissingConfig {
     [CmdletBinding()]
     param()
 
     $required = @(
         'AZURE_TENANT_ID',
         'AZURE_CLIENT_ID',
-        'AZURE_SUBSCRIPTION_ID',
         'AZURE_KEYVAULT_NAME',
-        'AZURE_KEYVAULT_KEY_NAME'
+        'AZURE_KEYVAULT_KEY_NAME',
+        'AZURE_CLIENT_SECRET'
     )
 
     $missing = @()
@@ -20,20 +20,6 @@ function Get-KeyVaultOidcMissingConfig {
     return $missing
 }
 
-function Get-GitHubOidcToken {
-    [CmdletBinding()]
-    param()
-
-    if ([string]::IsNullOrWhiteSpace($env:ACTIONS_ID_TOKEN_REQUEST_TOKEN) -or
-        [string]::IsNullOrWhiteSpace($env:ACTIONS_ID_TOKEN_REQUEST_URL)) {
-        throw 'GitHub OIDC request environment variables are unavailable.'
-    }
-
-    $uri = "$($env:ACTIONS_ID_TOKEN_REQUEST_URL)&audience=api://AzureADTokenExchange"
-    $headers = @{ Authorization = "Bearer $($env:ACTIONS_ID_TOKEN_REQUEST_TOKEN)" }
-    return (Invoke-RestMethod -Method Get -Uri $uri -Headers $headers).value
-}
-
 function Get-KeyVaultAccessToken {
     [CmdletBinding()]
     param(
@@ -44,16 +30,15 @@ function Get-KeyVaultAccessToken {
         [string] $ClientId,
 
         [Parameter(Mandatory)]
-        [string] $GitHubOidcToken
+        [string] $ClientSecret
     )
 
     $tokenEndpoint = "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token"
     $body = @{
-        client_id             = $ClientId
-        scope                 = 'https://vault.azure.net/.default'
-        grant_type            = 'client_credentials'
-        client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
-        client_assertion      = $GitHubOidcToken
+        client_id     = $ClientId
+        client_secret = $ClientSecret
+        scope         = 'https://vault.azure.net/.default'
+        grant_type    = 'client_credentials'
     }
 
     return (Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType 'application/x-www-form-urlencoded').access_token

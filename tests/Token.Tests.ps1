@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param()
 
-$null = . "$PSScriptRoot/Data/KeyVaultOidc.ps1"
+$null = . "$PSScriptRoot/Data/KeyVaultClientSecret.ps1"
 
 Describe 'Token segment' {
     Context 'ConvertFrom-Jwt' {
@@ -80,18 +80,16 @@ Describe 'Token segment' {
         }
     }
 
-    Context 'Key Vault OIDC signing (optional)' {
-        $missingConfig = Get-KeyVaultOidcMissingConfig
+    Context 'Key Vault client-secret signing (optional)' {
+        $missingConfig = Get-KeyVaultClientSecretMissingConfig
         $isConfigured = $missingConfig.Count -eq 0
 
-        It 'creates a JWT signed by Azure Key Vault using GitHub OIDC' -Skip:(-not $isConfigured) {
-            $token = New-Jwt -Payload @{ sub = 'oidc-app' } -Algorithm RS256 -Unsigned
-
-            $oidcToken = Get-GitHubOidcToken
+        It 'creates a JWT signed by Azure Key Vault using client credentials' -Skip:(-not $isConfigured) {
+            $token = New-Jwt -Payload @{ sub = 'spn-app' } -Algorithm RS256 -Unsigned
             $vaultToken = Get-KeyVaultAccessToken `
                 -TenantId $env:AZURE_TENANT_ID `
                 -ClientId $env:AZURE_CLIENT_ID `
-                -GitHubOidcToken $oidcToken
+                -ClientSecret $env:AZURE_CLIENT_SECRET
 
             $token.Signature = Invoke-KeyVaultSign `
                 -VaultName $env:AZURE_KEYVAULT_NAME `
