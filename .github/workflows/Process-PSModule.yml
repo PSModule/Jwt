@@ -30,4 +30,5 @@ jobs:
     uses: PSModule/Process-PSModule/.github/workflows/workflow.yml@0307c0d443c7daa295d10684017f1ac015efab38 # v6.1.12
     secrets:
       APIKey: ${{ secrets.APIKey }}
-      TestData: ${{ secrets.TestData }}
+      TestData: >-
+        {"variables":{"AZURE_TENANT_ID":"${{ vars.AZURE_TENANT_ID }}","AZURE_CLIENT_ID":"${{ vars.AZURE_CLIENT_ID }}","AZURE_SUBSCRIPTION_ID":"${{ vars.AZURE_SUBSCRIPTION_ID }}","AZURE_KEYVAULT_NAME":"${{ vars.AZURE_KEYVAULT_NAME }}","AZURE_KEYVAULT_KEY_NAME":"${{ vars.AZURE_KEYVAULT_KEY_NAME }}","AZURE_KEYVAULT_KEY_VERSION":"${{ vars.AZURE_KEYVAULT_KEY_VERSION }}"}}

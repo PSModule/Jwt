@@ -2,6 +2,8 @@
 [CmdletBinding()]
 param()
 
+$null = . "$PSScriptRoot/Data/KeyVaultOidc.ps1"
+
 Describe 'Token segment' {
     Context 'ConvertFrom-Jwt' {
         It 'parses a compact JWT into a Jwt object' {
@@ -77,5 +79,34 @@ Describe 'Token segment' {
             { Test-Jwt -Token $token -Key $secret -RequireExpiration $false -AllowedCriticalHeader 'kid' } | Should -Throw '*not present in header*'
         }
     }
-}
 
+    Context 'Key Vault OIDC signing (optional)' {
+        $missingConfig = Get-KeyVaultOidcMissingConfig
+        $isConfigured = $missingConfig.Count -eq 0
+
+        It 'creates a JWT signed by Azure Key Vault using GitHub OIDC' -Skip:(-not $isConfigured) {
+            $token = New-Jwt -Payload @{ sub = 'oidc-app' } -Algorithm RS256 -Unsigned
+
+            $oidcToken = Get-GitHubOidcToken
+            $vaultToken = Get-KeyVaultAccessToken `
+                -TenantId $env:AZURE_TENANT_ID `
+                -ClientId $env:AZURE_CLIENT_ID `
+                -GitHubOidcToken $oidcToken
+
+            $token.Signature = Invoke-KeyVaultSign `
+                -VaultName $env:AZURE_KEYVAULT_NAME `
+                -KeyName $env:AZURE_KEYVAULT_KEY_NAME `
+                -KeyVersion $env:AZURE_KEYVAULT_KEY_VERSION `
+                -AccessToken $vaultToken `
+                -SigningInput $token.SigningInput()
+
+            $jwk = Get-KeyVaultJwkPublicKey `
+                -VaultName $env:AZURE_KEYVAULT_NAME `
+                -KeyName $env:AZURE_KEYVAULT_KEY_NAME `
+                -KeyVersion $env:AZURE_KEYVAULT_KEY_VERSION `
+                -AccessToken $vaultToken
+
+            Test-Jwt -Token $token -Key $jwk -RequireExpiration $false | Should -BeTrue
+        }
+    }
+}

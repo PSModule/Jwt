@@ -97,6 +97,26 @@ $jwt.Signature = $externalSig    # base64url signature returned by Key Vault / H
 $jwt.ToString()
 ```
 
+### Optional CI test: sign with Azure Key Vault via GitHub OIDC
+
+The module-local `Token` suite includes an optional test that signs a JWT through Azure Key Vault using GitHub OIDC (no client secret).
+The test is skipped unless all required configuration values are present.
+
+Set these repository **variables** in the consumer repo:
+
+- `AZURE_TENANT_ID`
+- `AZURE_CLIENT_ID` (app registration / managed identity client ID with federated credential)
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_KEYVAULT_NAME`
+- `AZURE_KEYVAULT_KEY_NAME`
+- `AZURE_KEYVAULT_KEY_VERSION` (optional; latest is used when omitted)
+
+The calling Process-PSModule workflow maps them into `TestData`, and the test uses:
+
+1. GitHub OIDC token from `ACTIONS_ID_TOKEN_REQUEST_*`
+2. Microsoft identity token exchange for `https://vault.azure.net/.default`
+3. Key Vault `keys/sign` + `keys/get` to sign and verify with module commands
+
 ## Parse
 
 ```powershell
