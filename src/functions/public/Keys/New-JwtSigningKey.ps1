@@ -43,6 +43,10 @@ function New-JwtSigningKey {
         'PSUseOutputTypeCorrectly', '',
         Justification = 'Returns byte[]/RSA/ECDsa by algorithm family, or JwtKey with -AsJwk.'
     )]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseShouldProcessForStateChangingFunctions', '',
+        Justification = 'Creates in-memory key material and does not change external system state.'
+    )]
     [OutputType([byte[]], [System.Security.Cryptography.RSA], [System.Security.Cryptography.ECDsa], [JwtKey])]
     [CmdletBinding(DefaultParameterSetName = 'DotNetKey')]
     param(

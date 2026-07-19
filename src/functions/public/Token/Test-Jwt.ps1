@@ -215,7 +215,10 @@ function Test-Jwt {
                     if ($unsupportedHeaders.Count -gt 0) {
                         $unsupported = $unsupportedHeaders -join ', '
                         $criticalCheck.Passed = $false
-                        $criticalCheck.Reason = "Unsupported critical header parameters: $unsupported. Supply -AllowedCriticalHeader to explicitly permit them."
+                        $criticalCheck.Reason = (
+                            "Unsupported critical header parameters: $unsupported. " +
+                            'Supply -AllowedCriticalHeader to explicitly permit them.'
+                        )
                         throw [System.Security.Authentication.AuthenticationException]::new($criticalCheck.Reason)
                     }
                 }
