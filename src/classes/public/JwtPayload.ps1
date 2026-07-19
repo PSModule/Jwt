@@ -1,4 +1,7 @@
-﻿class JwtPayload {
+<#
+    JWT payload model with typed registered claims and preserved private claims.
+#>
+class JwtPayload {
     [string] $iss
     [string] $sub
     [object] $aud

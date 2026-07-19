@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Types>
+  <Type>
+    <Name>Jwt</Name>
+    <Members>
+      <ScriptProperty>
+        <Name>Algorithm</Name>
+        <GetScriptBlock>$this.Header.alg</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>KeyId</Name>
+        <GetScriptBlock>$this.Header.kid</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>Issuer</Name>
+        <GetScriptBlock>$this.Payload.iss</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>Subject</Name>
+        <GetScriptBlock>$this.Payload.sub</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>Audience</Name>
+        <GetScriptBlock>if ($this.Payload.aud -is [array]) { return ($this.Payload.aud -join ',') } ; return $this.Payload.aud</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>ExpiresAtUtc</Name>
+        <GetScriptBlock>if ($null -eq $this.Payload.exp) { return $null } ; return [DateTimeOffset]::FromUnixTimeSeconds([long]$this.Payload.exp).UtcDateTime.ToString('o')</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>HasSignature</Name>
+        <GetScriptBlock>-not [string]::IsNullOrEmpty($this.Signature)</GetScriptBlock>
+      </ScriptProperty>
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>Algorithm</Name>
+              <Name>KeyId</Name>
+              <Name>Issuer</Name>
+              <Name>Subject</Name>
+              <Name>Audience</Name>
+              <Name>ExpiresAtUtc</Name>
+              <Name>HasSignature</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+  <Type>
+    <Name>JwtHeader</Name>
+    <Members>
+      <ScriptProperty>
+        <Name>AdditionalFieldCount</Name>
+        <GetScriptBlock>if ($null -eq $this.AdditionalFields) { return 0 } ; return $this.AdditionalFields.Count</GetScriptBlock>
+      </ScriptProperty>
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>alg</Name>
+              <Name>typ</Name>
+              <Name>kid</Name>
+              <Name>AdditionalFieldCount</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+  <Type>
+    <Name>JwtPayload</Name>
+    <Members>
+      <ScriptProperty>
+        <Name>Audience</Name>
+        <GetScriptBlock>if ($this.aud -is [array]) { return ($this.aud -join ',') } ; return $this.aud</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>ExpiresAtUtc</Name>
+        <GetScriptBlock>if ($null -eq $this.exp) { return $null } ; return [DateTimeOffset]::FromUnixTimeSeconds([long]$this.exp).UtcDateTime.ToString('o')</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>NotBeforeUtc</Name>
+        <GetScriptBlock>if ($null -eq $this.nbf) { return $null } ; return [DateTimeOffset]::FromUnixTimeSeconds([long]$this.nbf).UtcDateTime.ToString('o')</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>IssuedAtUtc</Name>
+        <GetScriptBlock>if ($null -eq $this.iat) { return $null } ; return [DateTimeOffset]::FromUnixTimeSeconds([long]$this.iat).UtcDateTime.ToString('o')</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>AdditionalFieldCount</Name>
+        <GetScriptBlock>if ($null -eq $this.AdditionalFields) { return 0 } ; return $this.AdditionalFields.Count</GetScriptBlock>
+      </ScriptProperty>
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>iss</Name>
+              <Name>sub</Name>
+              <Name>Audience</Name>
+              <Name>ExpiresAtUtc</Name>
+              <Name>NotBeforeUtc</Name>
+              <Name>IssuedAtUtc</Name>
+              <Name>jti</Name>
+              <Name>AdditionalFieldCount</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+  <Type>
+    <Name>JwtKey</Name>
+    <Members>
+      <ScriptProperty>
+        <Name>Operations</Name>
+        <GetScriptBlock>if ($null -eq $this.key_ops) { return $null } ; return ($this.key_ops -join ',')</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>HasPrivateMaterial</Name>
+        <GetScriptBlock>$null -ne $this.d -or $null -ne $this.p -or $null -ne $this.q -or $null -ne $this.dp -or $null -ne $this.dq -or $null -ne $this.qi -or $null -ne $this.oth -or $null -ne $this.k</GetScriptBlock>
+      </ScriptProperty>
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>kid</Name>
+              <Name>kty</Name>
+              <Name>alg</Name>
+              <Name>use</Name>
+              <Name>crv</Name>
+              <Name>Operations</Name>
+              <Name>HasPrivateMaterial</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+  <Type>
+    <Name>JwtKeySet</Name>
+    <Members>
+      <ScriptProperty>
+        <Name>KeyCount</Name>
+        <GetScriptBlock>if ($null -eq $this.keys) { return 0 } ; return $this.keys.Count</GetScriptBlock>
+      </ScriptProperty>
+      <ScriptProperty>
+        <Name>KeyIds</Name>
+        <GetScriptBlock>if ($null -eq $this.keys) { return $null } ; return (($this.keys | ForEach-Object { $_.kid } | Where-Object { -not [string]::IsNullOrEmpty($_) }) -join ',')</GetScriptBlock>
+      </ScriptProperty>
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>KeyCount</Name>
+              <Name>KeyIds</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+</Types>

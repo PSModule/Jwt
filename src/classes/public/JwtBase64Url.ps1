@@ -1,4 +1,7 @@
-﻿class JwtBase64Url {
+<#
+    Base64url codec helper used by JWT/JWS/JWK serialization paths.
+#>
+class JwtBase64Url {
     static [string] Encode([byte[]] $bytes) {
         if ($null -eq $bytes -or $bytes.Length -eq 0) { return '' }
         $b64 = [Convert]::ToBase64String($bytes)

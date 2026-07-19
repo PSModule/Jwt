@@ -1,4 +1,8 @@
-﻿class JwtHeader {
+<#
+    JOSE header model for compact JWT/JWS tokens.
+    Unknown header parameters are preserved in AdditionalFields.
+#>
+class JwtHeader {
     [string] $alg
     [string] $typ = 'JWT'
     [string] $kid

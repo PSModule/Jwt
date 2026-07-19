@@ -1,4 +1,7 @@
-﻿class JwtKeySet {
+<#
+    JSON Web Key Set (JWKS) model containing one or more JwtKey entries.
+#>
+class JwtKeySet {
     [JwtKey[]] $keys = @()
     [System.Collections.Specialized.OrderedDictionary] $AdditionalFields = [ordered]@{}
 

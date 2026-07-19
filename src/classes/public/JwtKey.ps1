@@ -1,4 +1,8 @@
-﻿class JwtKey {
+<#
+    JSON Web Key (JWK) model for RSA, EC, and oct key types.
+    Unknown members are preserved in AdditionalFields.
+#>
+class JwtKey {
     [string] $kty
     [string] $use
     [string[]] $key_ops
