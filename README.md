@@ -31,10 +31,11 @@ The curve attached to an ECDSA key is checked against the algorithm's required c
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `New-Jwt`                                                   | Create a JWT from header overrides and claims; sign locally or `-Unsigned`        |
 | `ConvertFrom-Jwt`                                           | Parse a compact JWT string into a typed `[Jwt]` (no validation)                   |
-| `Test-Jwt`                                                  | Verify the signature and registered claims (`exp`, `nbf`, `iss`, `aud`)           |
+| `Test-Jwt`                                                  | Verify the signature and registered claims (`exp`, `nbf`, `iat`, `iss`, `aud`)    |
 | `Get-JwtHeader`                                             | Return the parsed `[JwtHeader]` of a token                                        |
 | `Get-JwtPayload`                                            | Return the parsed `[JwtPayload]` of a token                                       |
 | `Get-JwtClaim`                                              | Return one or more named claims (registered or private)                           |
+| `New-JwtSigningKey`                                         | Generate a compatible signing key (`byte[]` / `RSA` / `ECDsa`) or JWK             |
 | `ConvertTo-JwtKey`                                          | Convert an `RSA` / `ECDsa` / `byte[]` into a `[JwtKey]` (JWK)                     |
 | `ConvertFrom-JwtKey`                                        | Convert a `[JwtKey]` (JWK) back into a .NET key                                   |
 | `ConvertTo-JwtKeySet`                                       | Wrap one or more `[JwtKey]` in a `[JwtKeySet]` (JWKS)                             |
@@ -44,6 +45,8 @@ The curve attached to an ECDSA key is checked against the algorithm's required c
 | `ConvertTo-Base64UrlString` / `ConvertFrom-Base64UrlString` | Base64url codec helpers (RFC 4648 §5)                                             |
 
 Public types: `[Jwt]`, `[JwtHeader]`, `[JwtPayload]`, `[JwtKey]`, `[JwtKeySet]`, `[JwtBase64Url]`.
+
+Default type/format metadata is included for these classes. `JwtKey` output is intentionally summary-only so private key material (`d`, `p`, `q`, `dp`, `dq`, `qi`, `oth`, `k`) is not shown in default views.
 
 ## Create
 
@@ -63,7 +66,7 @@ $jwt.ToString()
 ### RS256 / PS256 with a local RSA key
 
 ```powershell
-$rsa = [System.Security.Cryptography.RSA]::Create(2048)
+$rsa = New-JwtSigningKey -Algorithm RS256 -RsaKeySize 2048
 New-Jwt -Payload @{ sub = 'app'; iss = 'https://issuer'; exp = 1900000000 } `
     -Header @{ kid = 'key-1' } -Algorithm RS256 -Key $rsa
 
@@ -74,9 +77,17 @@ New-Jwt -Payload @{ sub = 'app' } -Algorithm PS256 -Key $rsa
 ### ES256 / ES384 / ES512 with an EC key
 
 ```powershell
-$ec = [System.Security.Cryptography.ECDsa]::Create(
-    [System.Security.Cryptography.ECCurve]::CreateFromValue('1.2.840.10045.3.1.7'))   # P-256
+$ec = New-JwtSigningKey -Algorithm ES256
 New-Jwt -Payload @{ sub = 'app' } -Algorithm ES256 -Key $ec
+```
+
+### Let `New-Jwt` generate the key (parameter-set path)
+
+```powershell
+$result = New-Jwt -Payload @{ sub = 'app' } -Algorithm ES256 -GenerateKey -GeneratedKeyId 'ec-1' -IncludeGeneratedKey -IncludeGeneratedJwk
+$result.Token
+$result.Key   # ECDsa
+$result.Jwk   # JwtKey (private parameters included)
 ```
 
 ### Unsigned token, sign externally (HSM / Azure Key Vault)
@@ -116,6 +127,9 @@ Test-Jwt -Token $compactString -Key $rsaPublic `
 
 # Structured report
 Test-Jwt -Token $compactString -Key $rsaPublic -Detailed
+
+# Unsigned validation path (alg=none only)
+Test-Jwt -Token $unsignedCompact -AllowUnsigned -RequireExpiration $false
 ```
 
 `-Detailed` returns:
@@ -129,6 +143,7 @@ Checks             : @(
     @{ Name = 'Signature';   Passed = $true;  Reason = $null }
     @{ Name = 'Expiration';  Passed = $true;  Reason = $null }
     @{ Name = 'NotBefore';   Passed = $true;  Reason = $null }
+    @{ Name = 'IssuedAt';    Passed = $true;  Reason = $null }
     @{ Name = 'Issuer';      Passed = $true;  Reason = $null }
     @{ Name = 'Audience';    Passed = $true;  Reason = $null }
 )
