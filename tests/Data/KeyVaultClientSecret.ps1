@@ -1,4 +1,8 @@
 function Get-KeyVaultClientSecretMissingConfig {
+    <#
+    .SYNOPSIS
+    Returns missing environment variable names required for Key Vault client-secret tests.
+    #>
     [CmdletBinding()]
     param()
 
@@ -21,6 +25,10 @@ function Get-KeyVaultClientSecretMissingConfig {
 }
 
 function Get-KeyVaultAccessToken {
+    <#
+    .SYNOPSIS
+    Acquires an Azure AD access token for Key Vault using client credentials.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -45,6 +53,10 @@ function Get-KeyVaultAccessToken {
 }
 
 function Invoke-KeyVaultSign {
+    <#
+    .SYNOPSIS
+    Signs a JWT signing-input digest by calling the Azure Key Vault keys/sign endpoint.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -80,6 +92,10 @@ function Invoke-KeyVaultSign {
 }
 
 function Get-KeyVaultJwkPublicKey {
+    <#
+    .SYNOPSIS
+    Retrieves the public JWK for a Key Vault key and returns it as a JwtKey object.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
