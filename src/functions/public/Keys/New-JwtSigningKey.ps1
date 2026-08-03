@@ -86,7 +86,7 @@ function New-JwtSigningKey {
                 }
                 $bytes = [byte[]]::new($keyLength)
                 [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-                $key = $bytes
+                return , $bytes
             }
             '^(RS|PS)' {
                 $rsa = [System.Security.Cryptography.RSA]::Create()
