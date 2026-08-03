@@ -671,5 +671,81 @@ Describe 'Jwt module' {
             }
         }
     }
+
+    Context 'Production-level edge cases' {
+        BeforeAll {
+            $script:secret = 'a-string-secret-at-least-256-bits-long'
+            $script:goodJwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm HS256 -Key $script:secret
+        }
+
+        It 'Test-Jwt -Detailed reports the failed check when the signature is invalid' {
+            $compact = $script:goodJwt.ToString()
+            $parts = $compact.Split('.')
+            $parts[2] = ConvertTo-Base64UrlString ([byte[]](1..32))
+            $tampered = $parts -join '.'
+            $result = Test-Jwt -Token $tampered -Key $script:secret -RequireExpiration $false -Detailed
+
+            $result.Valid | Should -BeFalse
+            $result.SignatureValidated | Should -BeFalse
+            ($result.Checks | Where-Object Name -EQ 'Signature').Passed | Should -BeFalse
+        }
+
+        It 'Test-Jwt -Detailed reports the failed claim check' {
+            $nowSec = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            $expired = New-Jwt -Payload @{ sub = 'joe'; exp = $nowSec - 60 } -Algorithm HS256 -Key $script:secret
+            $result = Test-Jwt -Token $expired -Key $script:secret -Detailed
+
+            $result.Valid | Should -BeFalse
+            ($result.Checks | Where-Object Name -EQ 'Expiration').Passed | Should -BeFalse
+        }
+
+        It 'New-Jwt -GenerateKey produces valid tokens for all algorithm families' -ForEach @(
+            @{ Alg = 'HS256' },
+            @{ Alg = 'RS256' },
+            @{ Alg = 'ES256' }
+        ) {
+            $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm $Alg -GenerateKey
+
+            $jwt | Should -BeOfType [Jwt]
+            $jwt.Header.alg | Should -Be $Alg
+            $jwt.ToString().Split('.').Count | Should -Be 3
+            $jwt.Signature | Should -Not -BeNullOrEmpty
+        }
+
+        It 'ConvertFrom-Jwt accepts a SecureString token' {
+            $compact = $script:goodJwt.ToString()
+            $secure = ConvertTo-SecureString $compact -AsPlainText -Force
+            $parsed = ConvertFrom-Jwt -Token $secure
+
+            $parsed.Payload.sub | Should -Be 'joe'
+        }
+
+        It 'Test-Jwt returns false when the signature segment is empty for a signed algorithm' {
+            $compact = $script:goodJwt.ToString()
+            $parts = $compact.Split('.')
+            $emptySig = "$($parts[0]).$($parts[1])."
+
+            Test-Jwt -Token $emptySig -Key $script:secret -RequireExpiration $false | Should -BeFalse
+        }
+
+        It 'New-Jwt parameter validation rejects a non-hashtable payload' {
+            { New-Jwt -Payload 'not-a-hashtable' -Algorithm HS256 -Key $script:secret } |
+                Should -Throw
+        }
+
+        It 'Test-Jwt parameter validation rejects a null token' {
+            { Test-Jwt -Token $null -Key $script:secret -RequireExpiration $false } | Should -Throw
+        }
+
+        It 'Verbose output does not include the payload or key material' {
+            $payload = @{ sub = 'joe'; secret = 'do-not-leak' }
+            $verbose = & { New-Jwt -Payload $payload -Algorithm HS256 -Key $script:secret -Verbose } 4>&1 |
+                Where-Object { $_.GetType().Name -eq 'VerboseRecord' } |
+                Out-String
+
+            $verbose | Should -Not -Match 'do-not-leak'
+            $verbose | Should -Not -Match ([regex]::Escape($script:secret))
+        }
+    }
 }
 
