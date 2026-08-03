@@ -190,10 +190,10 @@
                     $curveOk = $expectedCurveNames -contains $name
                 }
                 if (-not $curveOk) {
-                    throw [System.ArgumentException]::new(
-                        "Algorithm $Algorithm requires curve $expectedCurve (OID $expectedCurveOid). The supplied $keyDescription uses OID '$oid' / name '$name'.",
-                        'Key'
-                    )
+                    $message = "Algorithm $Algorithm requires curve $expectedCurve " +
+                        "(OID $expectedCurveOid). The supplied $keyDescription " +
+                        "uses OID '$oid' / name '$name'."
+                    throw [System.ArgumentException]::new($message, 'Key')
                 }
             }
 
