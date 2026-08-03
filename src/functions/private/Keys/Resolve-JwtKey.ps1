@@ -57,16 +57,6 @@
         throw [System.ArgumentException]::new("Algorithm '$Algorithm' requires a -Key value.", 'Key')
     }
 
-    if ($Key -is [System.Security.SecureString]) {
-        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Key)
-        try {
-            $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-        } finally {
-            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-        }
-        $Key = $plain
-    }
-
     $family = switch -Regex ($Algorithm) {
         '^HS' { 'HS' }
         '^RS' { 'RSA' }
@@ -86,6 +76,22 @@
         'ES384' { '1.3.132.0.34' }
         'ES512' { '1.3.132.0.35' }
         default { $null }
+    }
+
+    if ($Key -is [System.Security.SecureString]) {
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Key)
+        try {
+            $plain = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+            if ($family -eq 'HS') {
+                # Convert directly to UTF-8 bytes so the plaintext string can be
+                # garbage-collected; HMAC accepts byte[] as the canonical key form.
+                $Key = [System.Text.Encoding]::UTF8.GetBytes($plain)
+            } else {
+                $Key = $plain
+            }
+        } finally {
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        }
     }
 
     if ($Key -is [JwtKey]) {
