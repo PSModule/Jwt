@@ -57,21 +57,25 @@
     switch -Regex ($Algorithm) {
         '^RS' {
             $rsa = [System.Security.Cryptography.RSA] $ResolvedKey
-            return $rsa.VerifyData(
-                $contentBytes,
-                $sigBytes,
-                $hash,
-                [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
-            )
+            try {
+                return $rsa.VerifyData(
+                    $contentBytes,
+                    $sigBytes,
+                    $hash,
+                    [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+                )
+            } catch { return $false }
         }
         '^PS' {
             $rsa = [System.Security.Cryptography.RSA] $ResolvedKey
-            return $rsa.VerifyData(
-                $contentBytes,
-                $sigBytes,
-                $hash,
-                [System.Security.Cryptography.RSASignaturePadding]::Pss
-            )
+            try {
+                return $rsa.VerifyData(
+                    $contentBytes,
+                    $sigBytes,
+                    $hash,
+                    [System.Security.Cryptography.RSASignaturePadding]::Pss
+                )
+            } catch { return $false }
         }
         '^HS' {
             $hmac = [System.Security.Cryptography.HMAC] $ResolvedKey
@@ -80,7 +84,9 @@
         }
         '^ES' {
             $ecdsa = [System.Security.Cryptography.ECDsa] $ResolvedKey
-            return $ecdsa.VerifyData($contentBytes, $sigBytes, $hash)
+            try {
+                return $ecdsa.VerifyData($contentBytes, $sigBytes, $hash)
+            } catch { return $false }
         }
     }
     return $false
