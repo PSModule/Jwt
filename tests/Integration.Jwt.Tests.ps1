@@ -330,6 +330,25 @@ Describe 'Jwt module' {
                 'Algorithm', 'CriticalHeaders', 'Signature', 'Expiration', 'NotBefore', 'IssuedAt', 'Issuer', 'Audience'
             )
         }
+
+        It 'returns a structured report for an unsupported algorithm' {
+            $h = ConvertTo-Base64UrlString '{"alg":"HS999","typ":"JWT"}'
+            $p = ConvertTo-Base64UrlString '{"sub":"joe"}'
+            $r = Test-Jwt -Token "$h.$p.sig" -Key 'secret' -Detailed
+
+            $r.Valid | Should -BeFalse
+            ($r.Checks | Where-Object Name -EQ 'Algorithm').Passed | Should -BeFalse
+            ($r.Checks | Where-Object Name -EQ 'Algorithm').Reason | Should -Match 'not supported'
+        }
+
+        It 'returns a structured report for a failed critical-header check' {
+            $secret = 'a-string-secret-at-least-256-bits-long'
+            $jwt = New-Jwt -Payload @{ sub = 'joe' } -Algorithm HS256 -Key $secret -Header @{ crit = @('kid') }
+            $r = Test-Jwt -Token $jwt -Key $secret -RequireExpiration $false -Detailed
+
+            $r.Valid | Should -BeFalse
+            ($r.Checks | Where-Object Name -EQ 'CriticalHeaders').Passed | Should -BeFalse
+        }
     }
 
     Context 'Get-JwtClaim' {

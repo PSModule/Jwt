@@ -106,11 +106,20 @@ function Test-Jwt {
         $criticalCheck = @{ Name = 'CriticalHeaders'; Passed = $true; Reason = $null }
         $sigCheck = @{ Name = 'Signature'; Passed = $false; Reason = $null }
         $signatureValidated = $false
+        $skipSignatureAndClaims = $false
+
+        $throwIfNotDetailed = {
+            param($reason)
+            if (-not $Detailed) {
+                throw [System.Security.Authentication.AuthenticationException]::new($reason)
+            }
+        }
 
         if ([string]::IsNullOrEmpty($alg)) {
             $algCheck.Passed = $false
             $algCheck.Reason = "JWT header is missing the 'alg' claim."
-            throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+            $skipSignatureAndClaims = $true
+            & $throwIfNotDetailed $algCheck.Reason
         }
 
         $supportedAlgs = @(
@@ -120,55 +129,68 @@ function Test-Jwt {
             'PS256', 'PS384', 'PS512'
         )
 
-        if ($PSCmdlet.ParameterSetName -eq 'UnsignedValidation') {
+        $isUnsigned = $PSCmdlet.ParameterSetName -eq 'UnsignedValidation'
+        if ($isUnsigned) {
             if ($alg -ne 'none') {
                 $algCheck.Passed = $false
                 $algCheck.Reason = "Parameter set 'UnsignedValidation' only supports tokens with alg='none'."
-                throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+                $skipSignatureAndClaims = $true
+                & $throwIfNotDetailed $algCheck.Reason
+            } else {
+                $sigCheck.Passed = $true
+                $sigCheck.Reason = 'Skipped (unsigned token)'
             }
-
-            $sigCheck.Passed = $true
-            $sigCheck.Reason = 'Skipped (unsigned token)'
-            $signatureValidated = $false
         } else {
             if ($alg -eq 'none') {
                 $algCheck.Passed = $false
                 $algCheck.Reason = "Algorithm 'none' rejected. Use -AllowUnsigned for unsigned tokens."
-                throw [System.Security.Authentication.AuthenticationException]::new($algCheck.Reason)
+                $skipSignatureAndClaims = $true
+                & $throwIfNotDetailed $algCheck.Reason
             }
 
-            if ($alg -in $supportedAlgs) {
-                $resolved = Resolve-JwtKey -Algorithm $alg -Key $Key
-                try {
-                    $sigOk = Test-JwtSignature `
-                        -SigningInput $parsed.SigningInput() `
-                        -Signature $parsed.Signature `
-                        -Algorithm $alg `
-                        -ResolvedKey $resolved
-                } finally {
-                    $shouldDispose = (
-                        $resolved -is [System.IDisposable] -and
-                        $Key -isnot [System.Security.Cryptography.RSA] -and
-                        $Key -isnot [System.Security.Cryptography.ECDsa]
-                    )
-                    if ($shouldDispose) {
-                        $resolved.Dispose()
-                    }
+            if ($alg -notin $supportedAlgs -and -not $skipSignatureAndClaims) {
+                $algCheck.Passed = $false
+                $allowed = ($supportedAlgs + 'none') -join ', '
+                $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: $allowed."
+                $skipSignatureAndClaims = $true
+                & $throwIfNotDetailed $algCheck.Reason
+            }
+        }
+
+        if (-not $skipSignatureAndClaims -and -not $isUnsigned) {
+            $resolved = Resolve-JwtKey -Algorithm $alg -Key $Key
+            try {
+                $sigOk = Test-JwtSignature `
+                    -SigningInput $parsed.SigningInput() `
+                    -Signature $parsed.Signature `
+                    -Algorithm $alg `
+                    -ResolvedKey $resolved
+            } finally {
+                $shouldDispose = (
+                    $resolved -is [System.IDisposable] -and
+                    $Key -isnot [System.Security.Cryptography.RSA] -and
+                    $Key -isnot [System.Security.Cryptography.ECDsa]
+                )
+                if ($shouldDispose) {
+                    $resolved.Dispose()
+                }
+            }
+
+            $headerValues = $parsed.Header.ToOrderedDictionary()
+            if ($headerValues.Contains('crit')) {
+                $critRaw = $headerValues['crit']
+                if ($critRaw -is [string]) {
+                    $critHeaders = @($critRaw)
+                } elseif ($critRaw -is [System.Collections.IEnumerable]) {
+                    $critHeaders = @($critRaw)
+                } else {
+                    $criticalCheck.Passed = $false
+                    $criticalCheck.Reason = "JWT header 'crit' must be an array of strings. Got [$($critRaw.GetType().FullName)]."
+                    $skipSignatureAndClaims = $true
+                    & $throwIfNotDetailed $criticalCheck.Reason
                 }
 
-                $headerValues = $parsed.Header.ToOrderedDictionary()
-                if ($headerValues.Contains('crit')) {
-                    $critRaw = $headerValues['crit']
-                    if ($critRaw -is [string]) {
-                        $critHeaders = @($critRaw)
-                    } elseif ($critRaw -is [System.Collections.IEnumerable]) {
-                        $critHeaders = @($critRaw)
-                    } else {
-                        $criticalCheck.Passed = $false
-                        $criticalCheck.Reason = "JWT header 'crit' must be an array of strings. Got [$($critRaw.GetType().FullName)]."
-                        throw [System.Security.Authentication.AuthenticationException]::new($criticalCheck.Reason)
-                    }
-
+                if (-not $skipSignatureAndClaims) {
                     $headerNameSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
                     foreach ($name in $headerValues.Keys) {
                         [void]$headerNameSet.Add([string]$name)
@@ -204,44 +226,43 @@ function Test-Jwt {
                     if ($invalidNames.Count -gt 0) {
                         $criticalCheck.Passed = $false
                         $criticalCheck.Reason = "JWT header 'crit' contains non-string or empty values."
-                        throw [System.Security.Authentication.AuthenticationException]::new($criticalCheck.Reason)
-                    }
-                    if ($missingHeaders.Count -gt 0) {
+                        $skipSignatureAndClaims = $true
+                        & $throwIfNotDetailed $criticalCheck.Reason
+                    } elseif ($missingHeaders.Count -gt 0) {
                         $missing = $missingHeaders -join ', '
                         $criticalCheck.Passed = $false
                         $criticalCheck.Reason = "JWT header 'crit' references parameters not present in header: $missing."
-                        throw [System.Security.Authentication.AuthenticationException]::new($criticalCheck.Reason)
-                    }
-                    if ($unsupportedHeaders.Count -gt 0) {
+                        $skipSignatureAndClaims = $true
+                        & $throwIfNotDetailed $criticalCheck.Reason
+                    } elseif ($unsupportedHeaders.Count -gt 0) {
                         $unsupported = $unsupportedHeaders -join ', '
                         $criticalCheck.Passed = $false
                         $criticalCheck.Reason = (
                             "Unsupported critical header parameters: $unsupported. " +
                             'Supply -AllowedCriticalHeader to explicitly permit them.'
                         )
-                        throw [System.Security.Authentication.AuthenticationException]::new($criticalCheck.Reason)
+                        $skipSignatureAndClaims = $true
+                        & $throwIfNotDetailed $criticalCheck.Reason
                     }
                 }
+            }
 
-                if ($sigOk) {
-                    $sigCheck.Passed = $true
-                    $signatureValidated = $true
-                } else {
-                    $sigCheck.Reason = 'Signature verification failed.'
-                }
+            if ($sigOk) {
+                $sigCheck.Passed = $true
+                $signatureValidated = $true
             } else {
-                $algCheck.Passed = $false
-                $allowed = ($supportedAlgs + 'none') -join ', '
-                $algCheck.Reason = "Algorithm '$alg' is not supported. Allowed: $allowed."
-                throw [System.Security.Authentication.AuthenticationException]::new(
-                    $algCheck.Reason)
+                $sigCheck.Reason = 'Signature verification failed.'
             }
         }
 
-        $claimArgs = @{ Payload = $parsed.Payload; ClockSkew = $ClockSkew; RequireExpiration = $RequireExpiration }
-        if ($PSBoundParameters.ContainsKey('Issuer')) { $claimArgs['Issuer'] = $Issuer }
-        if ($PSBoundParameters.ContainsKey('Audience')) { $claimArgs['Audience'] = $Audience }
-        $claimChecks = Test-JwtClaim @claimArgs
+        if (-not $skipSignatureAndClaims) {
+            $claimArgs = @{ Payload = $parsed.Payload; ClockSkew = $ClockSkew; RequireExpiration = $RequireExpiration }
+            if ($PSBoundParameters.ContainsKey('Issuer')) { $claimArgs['Issuer'] = $Issuer }
+            if ($PSBoundParameters.ContainsKey('Audience')) { $claimArgs['Audience'] = $Audience }
+            $claimChecks = Test-JwtClaim @claimArgs
+        } else {
+            $claimChecks = @()
+        }
 
         $checks = @($algCheck, $criticalCheck, $sigCheck) + $claimChecks
         $valid = -not ($checks | Where-Object { -not $_.Passed })
