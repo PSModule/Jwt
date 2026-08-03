@@ -172,15 +172,34 @@
             )
         }
         'EC' {
-            if ($Key -is [System.Security.Cryptography.ECDsa]) {
-                $params = $Key.ExportParameters($false)
+            $expectedCurveNames = switch ($Algorithm) {
+                'ES256' { @('nistP256', 'ECDSA_P256') }
+                'ES384' { @('nistP384', 'ECDSA_P384') }
+                'ES512' { @('nistP521', 'ECDSA_P521') }
+                default { @() }
+            }
+
+            $assertEcCurve = {
+                param($params, $keyDescription)
                 $oid = $params.Curve.Oid.Value
-                if ($oid -and $oid -ne $expectedCurveOid) {
+                $name = $params.Curve.Oid.FriendlyName
+                $curveOk = $false
+                if ($oid) {
+                    $curveOk = ($oid -eq $expectedCurveOid)
+                } elseif ($name) {
+                    $curveOk = $expectedCurveNames -contains $name
+                }
+                if (-not $curveOk) {
                     throw [System.ArgumentException]::new(
-                        "Algorithm $Algorithm requires curve $expectedCurve (OID $expectedCurveOid). The supplied ECDsa key uses OID $oid.",
+                        "Algorithm $Algorithm requires curve $expectedCurve (OID $expectedCurveOid). The supplied $keyDescription uses OID '$oid' / name '$name'.",
                         'Key'
                     )
                 }
+            }
+
+            if ($Key -is [System.Security.Cryptography.ECDsa]) {
+                $params = $Key.ExportParameters($false)
+                & $assertEcCurve $params 'ECDsa key'
                 return $Key
             }
             if ($Key -is [string]) {
@@ -191,15 +210,18 @@
                     )
                 }
                 $ecdsa = [System.Security.Cryptography.ECDsa]::Create()
-                $ecdsa.ImportFromPem($Key)
-                $params = $ecdsa.ExportParameters($false)
-                $oid = $params.Curve.Oid.Value
-                if ($oid -and $oid -ne $expectedCurveOid) {
+                try {
+                    $ecdsa.ImportFromPem($Key)
+                } catch {
                     $ecdsa.Dispose()
-                    throw [System.ArgumentException]::new(
-                        "Algorithm $Algorithm requires curve $expectedCurve (OID $expectedCurveOid). The supplied EC PEM uses OID $oid.",
-                        'Key'
-                    )
+                    throw
+                }
+                $params = $ecdsa.ExportParameters($false)
+                try {
+                    & $assertEcCurve $params 'EC PEM'
+                } catch {
+                    $ecdsa.Dispose()
+                    throw
                 }
                 return $ecdsa
             }

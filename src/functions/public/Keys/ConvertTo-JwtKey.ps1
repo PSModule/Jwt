@@ -79,9 +79,15 @@ function ConvertTo-JwtKey {
                         'ECDSA_P384' { 'P-384' }
                         'nistP521' { 'P-521' }
                         'ECDSA_P521' { 'P-521' }
-                        default { $oidName }
+                        default { $null }
                     }
                 }
+            }
+            if (-not $jwk.crv) {
+                throw [System.ArgumentException]::new(
+                    "Cannot determine a supported EC curve from OID '$oidValue' / name '$oidName'.",
+                    'Key'
+                )
             }
             $jwk.x = [JwtBase64Url]::Encode($params.Q.X)
             $jwk.y = [JwtBase64Url]::Encode($params.Q.Y)
