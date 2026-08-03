@@ -1,4 +1,4 @@
-function Get-KeyVaultClientSecretMissingConfig {
+﻿function Get-KeyVaultClientSecretMissingConfig {
     <#
     .SYNOPSIS
     Returns missing environment variable names required for Key Vault client-secret tests.
@@ -84,7 +84,7 @@ function Invoke-KeyVaultSign {
 
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($SigningInput)
     $digest = [System.Security.Cryptography.SHA256]::HashData($bytes)
-    $digestBase64Url = ConvertTo-Base64UrlString -InputObject $digest -NoEnumerateByteArray
+    $digestBase64Url = ConvertTo-Base64UrlString -InputObject $digest
 
     $headers = @{ Authorization = "Bearer $AccessToken" }
     $body = @{ alg = 'RS256'; value = $digestBase64Url } | ConvertTo-Json -Compress
